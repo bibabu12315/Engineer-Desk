@@ -1,12 +1,13 @@
 ﻿"""
 Todo 列表自定义控件
 支持新建、删除、修改、勾选完成，显示今日完成数量
+V1.1.1: Todo 项支持自动换行、自适应高度
 """
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
-    QLineEdit, QPushButton, QLabel, QScrollArea, QFrame,
+    QTextEdit, QPushButton, QLabel, QScrollArea, QFrame,
 )
 from PySide6.QtGui import QFont
 
@@ -14,9 +15,9 @@ from src.database.db_manager import DatabaseManager
 
 
 class TodoItemWidget(QFrame):
-    """单个 Todo 项控件"""
+    """单个 Todo 项控件，使用 QTextEdit 支持自动换行"""
 
-    changed = Signal()       # 内容变更信号
+    changed = Signal()                 # 内容变更信号
     remove_requested = Signal(object)  # 请求删除信号
 
     def __init__(
@@ -31,7 +32,11 @@ class TodoItemWidget(QFrame):
         self._completed: bool = completed
 
         self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setFixedHeight(36)
+        self.setMinimumHeight(30)
+        self.setSizePolicy(
+            self.sizePolicy().horizontalPolicy(),
+            self.sizePolicy().verticalPolicy().Preferred,
+        )
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 2, 4, 2)
@@ -41,13 +46,22 @@ class TodoItemWidget(QFrame):
         self._checkbox: QCheckBox = QCheckBox()
         self._checkbox.setChecked(completed)
         self._checkbox.toggled.connect(self._on_toggle)
-        layout.addWidget(self._checkbox)
+        layout.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
 
-        # 内容编辑框
-        self._edit: QLineEdit = QLineEdit(content)
+        # 内容编辑区域 — 使用 QTextEdit 支持自动换行
+        self._edit: QTextEdit = QTextEdit()
         self._edit.setPlaceholderText("输入待办事项...")
+        self._edit.setFrameShape(QTextEdit.Shape.NoFrame)
+        self._edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._edit.setStyleSheet(
-            "QLineEdit { border: none; background: transparent; }"
+            "QTextEdit { border: none; background: transparent; }"
+        )
+        self._edit.setPlainText(content)
+        self._edit.setAcceptRichText(False)
+        # 自适应高度：内容变化时调整控件高度
+        self._edit.document().documentLayout().documentSizeChanged.connect(
+            self._adjust_height
         )
         self._edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._edit, 1)
@@ -60,7 +74,18 @@ class TodoItemWidget(QFrame):
             "QPushButton:hover { color: #e74c3c; }"
         )
         self._delete_btn.clicked.connect(lambda: self.remove_requested.emit(self))
-        layout.addWidget(self._delete_btn)
+        layout.addWidget(self._delete_btn, 0, Qt.AlignmentFlag.AlignTop)
+
+        # 初始高度调整
+        self._adjust_height()
+
+    def _adjust_height(self) -> None:
+        """根据内容自适应调整控件高度"""
+        doc_h = self._edit.document().size().height()
+        margins = self._edit.contentsMargins()
+        total = int(doc_h + margins.top() + margins.bottom() + 8)
+        self.setMinimumHeight(max(total, 30))
+        self.setMaximumHeight(max(total, 300))
 
     @property
     def todo_id(self) -> int:
@@ -71,7 +96,7 @@ class TodoItemWidget(QFrame):
         return self._checkbox.isChecked()
 
     def text(self) -> str:
-        return self._edit.text().strip()
+        return self._edit.toPlainText().strip()
 
     def set_completed(self, completed: bool) -> None:
         """设置完成状态（不触发信号）"""
@@ -82,16 +107,14 @@ class TodoItemWidget(QFrame):
     def _on_toggle(self, checked: bool) -> None:
         """勾选状态切换"""
         self._completed = checked
-        font = self._edit.font()
-        font.setStrikeOut(checked)
-        self._edit.setFont(font)
         if checked:
             self._edit.setStyleSheet(
-                "QLineEdit { border: none; background: transparent; color: #999; }"
+                "QTextEdit { border: none; background: transparent; color: #999;"
+                " text-decoration: line-through; }"
             )
         else:
             self._edit.setStyleSheet(
-                "QLineEdit { border: none; background: transparent; }"
+                "QTextEdit { border: none; background: transparent; }"
             )
         self.changed.emit()
 
@@ -185,7 +208,6 @@ class TodoListWidget(QWidget):
             item.changed.connect(self._on_item_changed)
             item.remove_requested.connect(self._remove_item)
             self._items.append(item)
-            # 插入到 stretch 之前
             self._list_layout.insertWidget(self._list_layout.count() - 1, item)
 
         self._update_count()
@@ -211,7 +233,7 @@ class TodoListWidget(QWidget):
         self._update_count()
 
         # 自动聚焦到新创建的编辑框
-        item.findChild(QLineEdit).setFocus()
+        item.findChild(QTextEdit).setFocus()
 
     def _remove_item(self, item: TodoItemWidget) -> None:
         """删除 Todo 项"""

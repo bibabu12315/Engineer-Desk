@@ -1,0 +1,59 @@
+('D:\\project_code\\Python_project\\Engineer '
+ 'Desk\\build\\EngineerDesk\\EngineerDesk.pkg',
+ {'BINARY': True,
+  'DATA': True,
+  'EXECUTABLE': True,
+  'EXTENSION': True,
+  'PYMODULE': True,
+  'PYSOURCE': True,
+  'PYZ': False,
+  'SPLASH': True,
+  'SYMLINK': False},
+ [('pyi-contents-directory _internal', '', 'OPTION'),
+  ('PYZ-00.pyz',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\PYZ-00.pyz',
+   'PYZ'),
+  ('struct',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\localpycs\\struct.pyc',
+   'PYMODULE'),
+  ('pyimod01_archive',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\localpycs\\pyimod01_archive.pyc',
+   'PYMODULE'),
+  ('pyimod02_importers',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\localpycs\\pyimod02_importers.pyc',
+   'PYMODULE'),
+  ('pyimod03_ctypes',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\localpycs\\pyimod03_ctypes.pyc',
+   'PYMODULE'),
+  ('pyimod04_pywin32',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\build\\EngineerDesk\\localpycs\\pyimod04_pywin32.pyc',
+   'PYMODULE'),
+  ('pyiboot01_bootstrap',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\.venv\\Lib\\site-packages\\PyInstaller\\loader\\pyiboot01_bootstrap.py',
+   'PYSOURCE'),
+  ('pyi_rth_inspect',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_inspect.py',
+   'PYSOURCE'),
+  ('pyi_rth_pyside6',
+   'D:\\project_code\\Python_project\\Engineer '
+   'Desk\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks\\pyi_rth_pyside6.py',
+   'PYSOURCE'),
+  ('main',
+   'D:\\project_code\\Python_project\\Engineer Desk\\main.py',
+   'PYSOURCE')],
+ 'python314.dll',
+ True,
+ False,
+ False,
+ [],
+ None,
+ None,
+ None)

@@ -32,11 +32,14 @@ class StartupManager:
     def enable(cls) -> None:
         """启用开机启动"""
         exe_path = sys.executable
-        # 如果是通过 python 脚本运行，使用 pythonw 启动主脚本
-        script_path = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "main.py")
-        )
-        command = f'"{exe_path}" "{script_path}"'
+        # 打包为 exe 时直接启动可执行文件；源码运行时启动 main.py。
+        if getattr(sys, "frozen", False):
+            command = f'"{exe_path}"'
+        else:
+            script_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..", "..", "main.py")
+            )
+            command = f'"{exe_path}" "{script_path}"'
 
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER, cls._REG_PATH, 0, winreg.KEY_SET_VALUE

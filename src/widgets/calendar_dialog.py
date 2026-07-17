@@ -49,14 +49,11 @@ class CalendarDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
 
-        # 日历控件 —— 默认日期文字为浅灰色（无记录状态）
+        # 日历控件
         self._calendar = QCalendarWidget()
         self._calendar.setGridVisible(True)
         self._calendar.setVerticalHeaderFormat(
             QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
-        )
-        self._calendar.setStyleSheet(
-            "QCalendarWidget QAbstractItemView:enabled { color: #d0d0d0; }"
         )
         self._calendar.clicked.connect(self._on_date_clicked)
         today = date.today()
@@ -83,7 +80,7 @@ class CalendarDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _highlight_dates(self) -> None:
-        """有记录的日期恢复正常颜色 + 黄色背景，无记录保持灰显"""
+        """有记录的日期显示黄色背景高亮"""
         dates = self._db.get_all_dates()
 
         # 有记录的高亮格式

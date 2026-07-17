@@ -1,9 +1,10 @@
 ﻿"""
 便签文本编辑器控件
 提供自由文本输入区域，支持字体、字号、背景色和透明度设置
+粘贴时自动转为纯文本，保持与编辑器一致的字体样式
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtWidgets import QTextEdit, QWidget, QVBoxLayout
 from PySide6.QtGui import QFont, QColor
 
@@ -58,3 +59,12 @@ class StickyEditor(QTextEdit):
     def get_plain_content(self) -> str:
         """获取纯文本内容"""
         return self.toPlainText()
+
+    def insertFromMimeData(self, source: QMimeData) -> None:
+        """重写粘贴行为：只接受纯文本，丢弃所有格式"""
+        if source.hasText():
+            plain_text = source.text()
+            # 以当前字体插入纯文本
+            cursor = self.textCursor()
+            cursor.insertText(plain_text)
+        # 忽略所有非文本内容（图片、HTML 等）
