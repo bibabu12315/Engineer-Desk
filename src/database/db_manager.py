@@ -6,7 +6,7 @@
 import sqlite3
 import os
 import re
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 
@@ -36,6 +36,7 @@ class DatabaseManager:
         self._conn: Optional[sqlite3.Connection] = None
         self._connect()
         self._init_tables()
+        self._migrate()
 
     def _connect(self) -> None:
         """建立数据库连接"""
@@ -48,7 +49,7 @@ class DatabaseManager:
         """初始化数据库表结构"""
         cursor = self._conn.cursor()
 
-        # 便签表：每天一条记录
+        # 便签表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sticky_notes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,6 +77,7 @@ class DatabaseManager:
                 content TEXT DEFAULT '',
                 completed INTEGER DEFAULT 0,
                 sort_order INTEGER DEFAULT 0,
+                origin_date TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now','localtime')),
                 FOREIGN KEY (sticky_note_id) REFERENCES sticky_notes(id) ON DELETE CASCADE
             )
@@ -102,6 +104,19 @@ class DatabaseManager:
 
         self._conn.commit()
 
+    def _migrate(self) -> None:
+        """数据库迁移：为旧版本添加缺失的列"""
+        cursor = self._conn.cursor()
+        # 检查 origin_date 列是否存在
+        cursor.execute("PRAGMA table_info(todos)")
+        columns = {row["name"] for row in cursor.fetchall()}
+        if "origin_date" not in columns:
+            try:
+                cursor.execute("ALTER TABLE todos ADD COLUMN origin_date TEXT DEFAULT ''")
+                self._conn.commit()
+            except sqlite3.Error:
+                pass
+
     @property
     def conn(self) -> sqlite3.Connection:
         """获取数据库连接"""
@@ -126,8 +141,22 @@ class DatabaseManager:
             row = cursor.fetchone()
         return row
 
+    def get_or_create_note_by_date(self, target_date: str) -> sqlite3.Row:
+        """获取或创建指定日期的便签记录"""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM sticky_notes WHERE date = ?", (target_date,))
+        row = cursor.fetchone()
+        if row is None:
+            cursor.execute(
+                "INSERT INTO sticky_notes (date) VALUES (?)", (target_date,)
+            )
+            self.conn.commit()
+            cursor.execute("SELECT * FROM sticky_notes WHERE date = ?", (target_date,))
+            row = cursor.fetchone()
+        return row
+
     def update_note(self, note_id: int, **kwargs) -> None:
-        """更新便签字段"""
+        """更新便签字段（参数化查询，安全保留换行等特殊字符）"""
         allowed = {
             "title", "content", "font_family", "font_size",
             "bg_color", "opacity", "width", "height", "pos_x", "pos_y"
@@ -135,21 +164,26 @@ class DatabaseManager:
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return
-        updates["updated_at"] = "datetime('now','localtime')"
-        set_clause = ", ".join(
-            f"{k} = {v!r}" if k != "updated_at" else f"{k} = {v}"
-            for k, v in updates.items()
-        )
+
+        # 参数化查询：用 ? 占位符，避免 repr() 转义换行符等特殊字符
+        set_parts = []
+        params: list = []
+        for k, v in updates.items():
+            set_parts.append(f"{k} = ?")
+            params.append(v)
+        set_parts.append("updated_at = datetime('now','localtime')")
+        set_clause = ", ".join(set_parts)
+        params.append(note_id)
+
         try:
             self.conn.execute(
-                f"UPDATE sticky_notes SET {set_clause} WHERE id = ?", (note_id,)
+                f"UPDATE sticky_notes SET {set_clause} WHERE id = ?", params
             )
             self.conn.commit()
         except sqlite3.Error:
-            # 如果数据库损坏，尝试重建连接后重试一次
             self._reconnect()
             self.conn.execute(
-                f"UPDATE sticky_notes SET {set_clause} WHERE id = ?", (note_id,)
+                f"UPDATE sticky_notes SET {set_clause} WHERE id = ?", params
             )
             self.conn.commit()
 
@@ -181,7 +215,7 @@ class DatabaseManager:
         return [row["date"] for row in cursor.fetchall()]
 
     def get_adjacent_note(self, current_date: str, direction: str) -> Optional[sqlite3.Row]:
-        """获取相邻日期的便签（direction: 'prev' 或 'next'）"""
+        """获取相邻日期的便签"""
         cursor = self.conn.cursor()
         if direction == "prev":
             cursor.execute(
@@ -206,7 +240,7 @@ class DatabaseManager:
         )
         return cursor.fetchall()
 
-    def add_todo(self, note_id: int, content: str = "") -> sqlite3.Row:
+    def add_todo(self, note_id: int, content: str = "", origin_date: str = "") -> sqlite3.Row:
         """新增 Todo"""
         cursor = self.conn.cursor()
         cursor.execute(
@@ -214,9 +248,15 @@ class DatabaseManager:
             (note_id,),
         )
         next_order = cursor.fetchone()[0]
+
+        if not origin_date:
+            # 新创建的 todo，origin_date 设为所属便签的日期
+            row = self.get_note_by_id(note_id)
+            origin_date = row["date"] if row else date.today().isoformat()
+
         cursor.execute(
-            "INSERT INTO todos (sticky_note_id, content, sort_order) VALUES (?, ?, ?)",
-            (note_id, content, next_order),
+            "INSERT INTO todos (sticky_note_id, content, sort_order, origin_date) VALUES (?, ?, ?, ?)",
+            (note_id, content, next_order, origin_date),
         )
         self.conn.commit()
         cursor.execute("SELECT * FROM todos WHERE id = last_insert_rowid()")
@@ -240,6 +280,28 @@ class DatabaseManager:
         self.conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
         self.conn.commit()
 
+    def get_uncompleted_todos(self, note_id: int) -> list[sqlite3.Row]:
+        """获取未完成的 Todo"""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM todos WHERE sticky_note_id = ? AND completed = 0 ORDER BY sort_order, id",
+            (note_id,),
+        )
+        return cursor.fetchall()
+
+    def carry_over_todos(self, from_note_id: int, to_note_id: int) -> int:
+        """将未完成任务顺延到目标日期，返回顺延数量"""
+        uncompleted = self.get_uncompleted_todos(from_note_id)
+        count = 0
+        for todo in uncompleted:
+            self.add_todo(
+                note_id=to_note_id,
+                content=todo["content"],
+                origin_date=todo["origin_date"] or self.get_note_by_id(from_note_id)["date"],
+            )
+            count += 1
+        return count
+
     def get_today_completed_count(self, note_id: int) -> int:
         """获取今日已完成 Todo 数量"""
         cursor = self.conn.cursor()
@@ -248,6 +310,16 @@ class DatabaseManager:
             (note_id,),
         )
         return cursor.fetchone()[0]
+
+    def calc_days_active(self, origin_date_str: str) -> int:
+        """计算任务已持续天数"""
+        if not origin_date_str:
+            return 1
+        try:
+            origin = datetime.strptime(origin_date_str, "%Y-%m-%d").date()
+            return (date.today() - origin).days + 1
+        except ValueError:
+            return 1
 
     # ==================== Tag 操作 ====================
 
@@ -261,9 +333,8 @@ class DatabaseManager:
         return [row["tag_name"] for row in cursor.fetchall()]
 
     def set_tags(self, note_id: int, content: str) -> list[str]:
-        """从内容中提取 #Tag 并更新数据库，返回标签列表"""
+        """从内容中提取 #Tag 并更新数据库"""
         tags = self._extract_tags(content)
-
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM note_tags WHERE sticky_note_id = ?", (note_id,))
         for tag in tags:
@@ -296,10 +367,9 @@ class DatabaseManager:
     # ==================== 搜索操作 ====================
 
     def search_notes(self, query: str) -> list[sqlite3.Row]:
-        """搜索便签（标题、正文、标签）——使用 LIKE 模糊匹配"""
+        """搜索便签（标题、正文、标签）"""
         cursor = self.conn.cursor()
         like_pattern = f"%{query}%"
-
         cursor.execute("""
             SELECT DISTINCT sn.* FROM sticky_notes sn
             LEFT JOIN note_tags nt ON nt.sticky_note_id = sn.id

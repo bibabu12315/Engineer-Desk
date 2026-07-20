@@ -1,24 +1,23 @@
 ﻿"""
 便签文本编辑器控件
-提供自由文本输入区域，支持字体、字号、背景色和透明度设置
-粘贴时自动转为纯文本，保持与编辑器一致的字体样式
+基于 QPlainTextEdit，原生支持纯文本换行，粘贴自动去格式
 """
 
 from PySide6.QtCore import Qt, Signal, QMimeData
-from PySide6.QtWidgets import QTextEdit, QWidget, QVBoxLayout
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtWidgets import QPlainTextEdit, QWidget
+from PySide6.QtGui import QFont
 
 
-class StickyEditor(QTextEdit):
-    """便签文本编辑器"""
+class StickyEditor(QPlainTextEdit):
+    """便签文本编辑器（纯文本，无富文本干扰）"""
 
     content_changed = Signal()  # 内容变更信号
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setPlaceholderText("在这里记录今天的想法...")
-        self.setFrameShape(QTextEdit.Shape.NoFrame)
-        self.setStyleSheet("QTextEdit { background: transparent; }")
+        self.setFrameShape(QPlainTextEdit.Shape.NoFrame)
+        self.setStyleSheet("QPlainTextEdit { background: transparent; }")
 
         # 默认字体
         self._font_family: str = "Microsoft YaHei"
@@ -63,8 +62,4 @@ class StickyEditor(QTextEdit):
     def insertFromMimeData(self, source: QMimeData) -> None:
         """重写粘贴行为：只接受纯文本，丢弃所有格式"""
         if source.hasText():
-            plain_text = source.text()
-            # 以当前字体插入纯文本
-            cursor = self.textCursor()
-            cursor.insertText(plain_text)
-        # 忽略所有非文本内容（图片、HTML 等）
+            self.insertPlainText(source.text())

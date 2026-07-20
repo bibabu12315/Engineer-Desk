@@ -249,6 +249,17 @@ class StickyNoteWindow(QMainWindow):
         today_btn.clicked.connect(self._goto_today)
         layout.addWidget(today_btn)
 
+        # 顺延按钮
+        self._carry_btn = QPushButton("⏩ 顺延未完成")
+        self._carry_btn.setFixedHeight(20)
+        self._carry_btn.setToolTip("将未完成的 Todo 复制到明天")
+        self._carry_btn.setStyleSheet(
+            "QPushButton { border: none; color: #888; font-size: 10px; }"
+            "QPushButton:hover { color: #4a90d9; }"
+        )
+        self._carry_btn.clicked.connect(self._carry_over_todos)
+        layout.addWidget(self._carry_btn)
+
         layout.addStretch()
 
         self._save_status = QLabel("")
@@ -256,6 +267,25 @@ class StickyNoteWindow(QMainWindow):
         layout.addWidget(self._save_status)
 
         return bar
+
+    def _carry_over_todos(self) -> None:
+        """将未完成的 Todo 顺延到明天"""
+        from datetime import date, timedelta
+        self._save_all()
+
+        today = date.today()
+        tomorrow = (today + timedelta(days=1)).isoformat()
+        tomorrow_note = self._db.get_or_create_note_by_date(tomorrow)
+
+        count = self._db.carry_over_todos(self._note_id, tomorrow_note["id"])
+        if count > 0:
+            self._save_status.setText(f"已顺延 {count} 项到明天")
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(3000, lambda: self._save_status.setText(""))
+        else:
+            self._save_status.setText("没有未完成的任务")
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(2000, lambda: self._save_status.setText(""))
 
     @staticmethod
     def _icon_btn_style() -> str:

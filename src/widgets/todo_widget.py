@@ -1,7 +1,6 @@
 ﻿"""
 Todo 列表自定义控件
-支持新建、删除、修改、勾选完成，显示今日完成数量
-V1.1.1: Todo 项支持自动换行、自适应高度
+支持新建、删除、修改、勾选完成，显示今日完成数量和任务持续天数
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -15,21 +14,24 @@ from src.database.db_manager import DatabaseManager
 
 
 class TodoItemWidget(QFrame):
-    """单个 Todo 项控件，使用 QTextEdit 支持自动换行"""
+    """单个 Todo 项控件，显示持续天数"""
 
-    changed = Signal()                 # 内容变更信号
-    remove_requested = Signal(object)  # 请求删除信号
+    changed = Signal()
+    remove_requested = Signal(object)
 
     def __init__(
         self,
         todo_id: int,
         content: str = "",
         completed: bool = False,
+        origin_date: str = "",
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._todo_id: int = todo_id
         self._completed: bool = completed
+        self._origin_date: str = origin_date
+        self._db: DatabaseManager = DatabaseManager()
 
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setMinimumHeight(30)
@@ -48,7 +50,7 @@ class TodoItemWidget(QFrame):
         self._checkbox.toggled.connect(self._on_toggle)
         layout.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
 
-        # 内容编辑区域 — 使用 QTextEdit 支持自动换行
+        # 内容编辑区域
         self._edit: QTextEdit = QTextEdit()
         self._edit.setPlaceholderText("输入待办事项...")
         self._edit.setFrameShape(QTextEdit.Shape.NoFrame)
@@ -59,12 +61,22 @@ class TodoItemWidget(QFrame):
         )
         self._edit.setPlainText(content)
         self._edit.setAcceptRichText(False)
-        # 自适应高度：内容变化时调整控件高度
         self._edit.document().documentLayout().documentSizeChanged.connect(
             self._adjust_height
         )
         self._edit.textChanged.connect(self._on_text_changed)
         layout.addWidget(self._edit, 1)
+
+        # 持续天数标签
+        days = self._db.calc_days_active(origin_date)
+        self._days_label = QLabel()
+        self._days_label.setStyleSheet(
+            "color: #aaa; font-size: 10px; padding: 2px 4px;"
+        )
+        if days > 1:
+            self._days_label.setText(f"{days}天")
+            self._days_label.setToolTip(f"已持续 {days} 天")
+        layout.addWidget(self._days_label, 0, Qt.AlignmentFlag.AlignTop)
 
         # 删除按钮
         self._delete_btn: QPushButton = QPushButton("×")
@@ -76,7 +88,6 @@ class TodoItemWidget(QFrame):
         self._delete_btn.clicked.connect(lambda: self.remove_requested.emit(self))
         layout.addWidget(self._delete_btn, 0, Qt.AlignmentFlag.AlignTop)
 
-        # 初始高度调整
         self._adjust_height()
 
     def _adjust_height(self) -> None:
@@ -99,13 +110,11 @@ class TodoItemWidget(QFrame):
         return self._edit.toPlainText().strip()
 
     def set_completed(self, completed: bool) -> None:
-        """设置完成状态（不触发信号）"""
         self._checkbox.blockSignals(True)
         self._checkbox.setChecked(completed)
         self._checkbox.blockSignals(False)
 
     def _on_toggle(self, checked: bool) -> None:
-        """勾选状态切换"""
         self._completed = checked
         if checked:
             self._edit.setStyleSheet(
@@ -119,14 +128,13 @@ class TodoItemWidget(QFrame):
         self.changed.emit()
 
     def _on_text_changed(self) -> None:
-        """文本变更时发射信号"""
         self.changed.emit()
 
 
 class TodoListWidget(QWidget):
-    """Todo 列表控件，包含统计标签"""
+    """Todo 列表控件"""
 
-    todo_changed = Signal()  # Todo 列表变更信号
+    todo_changed = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -142,7 +150,6 @@ class TodoListWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        # 头部：标题 + 统计
         header = QHBoxLayout()
         header.setContentsMargins(8, 4, 8, 4)
 
@@ -158,7 +165,6 @@ class TodoListWidget(QWidget):
         self._count_label.setStyleSheet("color: #888;")
         header.addWidget(self._count_label)
 
-        # 添加按钮
         add_btn = QPushButton("+ 新建")
         add_btn.setFixedHeight(26)
         add_btn.setStyleSheet(
@@ -171,14 +177,12 @@ class TodoListWidget(QWidget):
 
         layout.addLayout(header)
 
-        # 分隔线
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("color: #e0e0e0;")
         sep.setFixedHeight(1)
         layout.addWidget(sep)
 
-        # 滚动区域
         self._scroll_area = QScrollArea()
         self._scroll_area.setWidgetResizable(True)
         self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -204,6 +208,7 @@ class TodoListWidget(QWidget):
                 todo_id=row["id"],
                 content=row["content"],
                 completed=bool(row["completed"]),
+                origin_date=row["origin_date"] or "",
             )
             item.changed.connect(self._on_item_changed)
             item.remove_requested.connect(self._remove_item)
@@ -225,14 +230,16 @@ class TodoListWidget(QWidget):
             return
 
         row = self._db.add_todo(self._note_id)
-        item = TodoItemWidget(todo_id=row["id"])
+        item = TodoItemWidget(
+            todo_id=row["id"],
+            origin_date=row["origin_date"] or "",
+        )
         item.changed.connect(self._on_item_changed)
         item.remove_requested.connect(self._remove_item)
         self._items.append(item)
         self._list_layout.insertWidget(self._list_layout.count() - 1, item)
         self._update_count()
 
-        # 自动聚焦到新创建的编辑框
         item.findChild(QTextEdit).setFocus()
 
     def _remove_item(self, item: TodoItemWidget) -> None:
@@ -245,7 +252,7 @@ class TodoListWidget(QWidget):
         self.todo_changed.emit()
 
     def _on_item_changed(self) -> None:
-        """Todo 项变更时保存到数据库"""
+        """Todo 项变更时保存"""
         for item in self._items:
             self._db.update_todo(
                 item.todo_id,
@@ -262,5 +269,5 @@ class TodoListWidget(QWidget):
         self._count_label.setText(f"完成: {completed}/{total}")
 
     def save_all(self) -> None:
-        """保存所有 Todo 项到数据库"""
+        """保存所有 Todo 项"""
         self._on_item_changed()
