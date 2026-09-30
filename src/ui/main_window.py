@@ -78,9 +78,14 @@ class StickyNoteWindow(QMainWindow):
         self._init_ui()
         self._load_data()
 
+        # 监听屏幕变化：外接屏拔掉后自动把窗口拉回可见区域
         app = QApplication.instance()
         if app is not None:
             app.installEventFilter(self)
+            try:
+                app.screenRemoved.connect(self._on_screen_removed)
+            except Exception:
+                pass
 
     def _init_ui(self) -> None:
         """初始化界面"""
@@ -239,6 +244,17 @@ class StickyNoteWindow(QMainWindow):
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
 
+        # 快速切换：前一天
+        self._quick_prev_btn = QPushButton("＜")
+        self._quick_prev_btn.setFixedSize(20, 20)
+        self._quick_prev_btn.setToolTip("前一天")
+        self._quick_prev_btn.setStyleSheet(
+            "QPushButton { border: none; color: #888; font-size: 10px; }"
+            "QPushButton:hover { color: #333; }"
+        )
+        self._quick_prev_btn.clicked.connect(lambda: self._navigate_date("prev"))
+        layout.addWidget(self._quick_prev_btn)
+
         # 回到今天按钮
         today_btn = QPushButton("回到今天")
         today_btn.setFixedHeight(20)
@@ -249,10 +265,21 @@ class StickyNoteWindow(QMainWindow):
         today_btn.clicked.connect(self._goto_today)
         layout.addWidget(today_btn)
 
+        # 快速切换：后一天
+        self._quick_next_btn = QPushButton("＞")
+        self._quick_next_btn.setFixedSize(20, 20)
+        self._quick_next_btn.setToolTip("后一天")
+        self._quick_next_btn.setStyleSheet(
+            "QPushButton { border: none; color: #888; font-size: 10px; }"
+            "QPushButton:hover { color: #333; }"
+        )
+        self._quick_next_btn.clicked.connect(lambda: self._navigate_date("next"))
+        layout.addWidget(self._quick_next_btn)
+
         # 顺延按钮
         self._carry_btn = QPushButton("⏩ 顺延未完成")
         self._carry_btn.setFixedHeight(20)
-        self._carry_btn.setToolTip("将未完成的 Todo 复制到明天")
+        self._carry_btn.setToolTip("将未完成的 Todo 顺延到当前查看日期的下一天")
         self._carry_btn.setStyleSheet(
             "QPushButton { border: none; color: #888; font-size: 10px; }"
             "QPushButton:hover { color: #4a90d9; }"
@@ -262,24 +289,82 @@ class StickyNoteWindow(QMainWindow):
 
         layout.addStretch()
 
+        # 居中按钮：将便签移动到主屏幕中央（外接屏拔掉后窗口可能落在不可见区域）
+        self._center_btn = QPushButton("⛶")
+        self._center_btn.setFixedSize(22, 20)
+        self._center_btn.setToolTip("移动到主屏幕中央")
+        self._center_btn.setStyleSheet(
+            "QPushButton { border: none; color: #888; font-size: 13px; }"
+            "QPushButton:hover { color: #4a90d9; }"
+        )
+        self._center_btn.clicked.connect(lambda: self.center_on_primary_screen())
+        layout.addWidget(self._center_btn)
+
         self._save_status = QLabel("")
         self._save_status.setStyleSheet("color: #4caf50; font-size: 10px;")
         layout.addWidget(self._save_status)
 
         return bar
 
+    # ==================== 屏幕定位 ====================
+
+    def center_on_primary_screen(self, reveal: bool = True) -> None:
+        """将便签移动到主屏幕中央
+
+        用于解决外接显示器拔掉后，便签停留在已消失的扩展屏坐标上导致找不到的问题。
+
+        :param reveal: 是否同时显示并激活窗口（菜单/按钮触发时为 True）
+        """
+        screen = QApplication.primaryScreen()
+        if screen is None:
+            return
+
+        area = screen.availableGeometry()
+        frame = self.frameGeometry()
+        x = area.x() + (area.width() - frame.width()) // 2
+        y = area.y() + (area.height() - frame.height()) // 2
+        self.move(x, y)
+
+        if reveal:
+            if self.isHidden():
+                self.show_window()
+            else:
+                self.raise_()
+                self.activateWindow()
+
+        self._auto_save.trigger()
+
+    def _ensure_on_screen(self) -> None:
+        """若窗口已不在任何屏幕的可视区域内，则移回主屏幕中央"""
+        app = QApplication.instance()
+        if app is None:
+            return
+
+        frame = self.frameGeometry()
+        for screen in app.screens():
+            if screen.availableGeometry().intersects(frame):
+                return
+
+        # 窗口已经不可见，仅移动位置，不强制弹出（避免打断隐藏到托盘的状态）
+        self.center_on_primary_screen(reveal=False)
+
+    def _on_screen_removed(self, screen) -> None:
+        """屏幕被移除（如拔掉外接显示器）后，确保窗口仍然可见"""
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(300, self._ensure_on_screen)
+
     def _carry_over_todos(self) -> None:
-        """将未完成的 Todo 顺延到明天"""
+        """将未完成的 Todo 顺延到当前查看日期的下一天"""
         from datetime import date, timedelta
         self._save_all()
 
-        today = date.today()
-        tomorrow = (today + timedelta(days=1)).isoformat()
-        tomorrow_note = self._db.get_or_create_note_by_date(tomorrow)
+        current_date = date.fromisoformat(self._note["date"])
+        next_date = (current_date + timedelta(days=1)).isoformat()
+        next_note = self._db.get_or_create_note_by_date(next_date)
 
-        count = self._db.carry_over_todos(self._note_id, tomorrow_note["id"])
+        count = self._db.carry_over_todos(self._note_id, next_note["id"])
         if count > 0:
-            self._save_status.setText(f"已顺延 {count} 项到明天")
+            self._save_status.setText(f"已顺延 {count} 项到 {next_date}")
             from PySide6.QtCore import QTimer
             QTimer.singleShot(3000, lambda: self._save_status.setText(""))
         else:
@@ -400,6 +485,8 @@ class StickyNoteWindow(QMainWindow):
 
         self._prev_btn.setEnabled(prev is not None)
         self._next_btn.setEnabled(next_note is not None)
+        self._quick_prev_btn.setEnabled(prev is not None)
+        self._quick_next_btn.setEnabled(next_note is not None)
 
     # ==================== 对话框 ====================
 
@@ -556,6 +643,9 @@ class StickyNoteWindow(QMainWindow):
         # 置顶状态
         self._update_pin_display()
         self._update_nav_buttons()
+
+        # 启动时若窗口落在不可见区域（如上次停在外接屏），自动移回主屏幕
+        self._ensure_on_screen()
 
     def _update_pin_display(self) -> None:
         """更新置顶按钮的显示状态"""

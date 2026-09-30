@@ -1,13 +1,18 @@
 ﻿"""
 数据库管理模块
 负责 SQLite 数据库的初始化、连接管理和基础 CRUD 操作
+
+数据库固定存放在工程内的 data/ 目录，升级/重新打包不会清空历史数据。
+首次启动时会自动从旧位置（%APPDATA%\\EngineerDesk）迁移历史数据。
 """
 
 import sqlite3
-import os
 import re
 from datetime import date, datetime
+from pathlib import Path
 from typing import Optional
+
+from src.utils import paths
 
 
 class DatabaseManager:
@@ -26,17 +31,62 @@ class DatabaseManager:
             return
         self._initialized = True
 
-        # 数据库文件存放在用户目录下，确保离线可用
+        # 数据库文件存放在工程内的 data/ 目录，保证升级更新不丢失历史数据
         if not db_path:
-            app_data = os.path.join(os.environ.get("APPDATA", ""), "EngineerDesk")
-            os.makedirs(app_data, exist_ok=True)
-            db_path = os.path.join(app_data, "engineer_desk.db")
+            db_path = str(paths.get_database_path())
 
         self._db_path: str = db_path
         self._conn: Optional[sqlite3.Connection] = None
+
+        self._migrate_legacy_data(Path(self._db_path))
+
         self._connect()
         self._init_tables()
         self._migrate()
+
+    @staticmethod
+    def _migrate_legacy_data(target: Path) -> bool:
+        """将旧位置的数据库迁移到工程 data 目录
+
+        仅在目标数据库不存在或为空时执行，绝不覆盖已有数据。
+        使用 SQLite 在线备份接口，可安全复制仍处于 WAL 模式、甚至正在被占用的数据库。
+
+        :param target: 新的数据库文件路径
+        :return: 是否执行了迁移
+        """
+        # 目标库已存在且有内容：不迁移，避免覆盖现有数据
+        if target.exists() and target.stat().st_size > 0:
+            return False
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target_resolved = target.resolve()
+
+        for legacy in paths.get_legacy_database_paths():
+            try:
+                if not legacy.is_file() or legacy.stat().st_size == 0:
+                    continue
+                if legacy.resolve() == target_resolved:
+                    continue
+            except OSError:
+                continue
+
+            try:
+                source = sqlite3.connect(str(legacy))
+                destination = sqlite3.connect(str(target))
+                with destination:
+                    source.backup(destination)
+                source.close()
+                destination.close()
+                return True
+            except sqlite3.Error:
+                # 迁移失败不影响正常启动，使用空白数据库继续运行
+                try:
+                    if target.exists() and target.stat().st_size == 0:
+                        target.unlink()
+                except OSError:
+                    pass
+
+        return False
 
     def _connect(self) -> None:
         """建立数据库连接"""

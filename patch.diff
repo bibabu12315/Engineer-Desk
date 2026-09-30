@@ -1,0 +1,35 @@
+﻿*** Begin Patch
+*** Update File: src/ui/main_window.py
+@@ -252,8 +252,8 @@
+-        self._carry_btn = QPushButton("\u23e9 \u987a\u5ef6\u672a\u5b8c\u6210")
+-        self._carry_btn.setFixedHeight(20)
+-        self._carry_btn.setToolTip("\u5c06\u672a\u5b8c\u6210\u7684 Todo \u590d\u5236\u5230\u660e\u5929")
++        self._carry_btn = QPushButton("\u23e9 \u987a\u5ef6\u672a\u5b8c\u6210")
++        self._carry_btn.setFixedHeight(20)
++        self._carry_btn.setToolTip("\u5c06\u672a\u5b8c\u6210\u7684 Todo \u987a\u5ef6\u5230\u5f53\u524d\u67e5\u770b\u65e5\u671f\u7684\u4e0b\u4e00\u5929")
+@@ -271,13 +271,13 @@
+-    def _carry_over_todos(self) -> None:
+-        """\u5c06\u672a\u5b8c\u6210\u7684 Todo \u987a\u5ef6\u5230\u660e\u5929"""
+-        from datetime import date, timedelta
+-        self._save_all()
+-
+-        today = date.today()
+-        tomorrow = (today + timedelta(days=1)).isoformat()
+-        tomorrow_note = self._db.get_or_create_note_by_date(tomorrow)
+-
+-        count = self._db.carry_over_todos(self._note_id, tomorrow_note["id"])
+-        if count > 0:
+-            self._save_status.setText(f"\u5df2\u987a\u5ef6 {count} \u9879\u5230\u660e\u5929")
++    def _carry_over_todos(self) -> None:
++        """\u5c06\u672a\u5b8c\u6210\u7684 Todo \u987a\u5ef6\u5230\u5f53\u524d\u67e5\u770b\u65e5\u671f\u7684\u4e0b\u4e00\u5929"""
++        from datetime import date, timedelta
++        self._save_all()
++
++        current_date = date.fromisoformat(self._note["date"])
++        next_date = (current_date + timedelta(days=1)).isoformat()
++        next_note = self._db.get_or_create_note_by_date(next_date)
++
++        count = self._db.carry_over_todos(self._note_id, next_note["id"])
++        if count > 0:
++            self._save_status.setText(f"\u5df2\u987a\u5ef6 {count} \u9879\u5230 {next_date}")
+*** End Patch

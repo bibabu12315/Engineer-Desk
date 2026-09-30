@@ -18,11 +18,13 @@ class SystemTray(QObject):
         self,
         show_callback: callable,
         exit_callback: callable,
+        center_callback: callable | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self._show_callback: callable = show_callback
         self._exit_callback: callable = exit_callback
+        self._center_callback: callable = center_callback
         self._config: ConfigManager = ConfigManager()
 
         self._tray: QSystemTrayIcon = QSystemTrayIcon(self)
@@ -50,6 +52,11 @@ class SystemTray(QObject):
         # 显示
         show_action = menu.addAction("显示")
         show_action.triggered.connect(self._show_callback)
+
+        # 移动到主屏幕中央（外接屏拔掉后窗口可能不可见）
+        if self._center_callback is not None:
+            center_action = menu.addAction("移动到主屏幕中央")
+            center_action.triggered.connect(lambda: self._center_callback())
 
         # 开机启动
         self._auto_start_action = menu.addAction("开机启动")

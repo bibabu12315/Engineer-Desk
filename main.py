@@ -35,6 +35,7 @@ def main() -> None:
     tray = SystemTray(
         show_callback=window.show_window,
         exit_callback=lambda: _quit_app(app, window),
+        center_callback=lambda: window.center_on_primary_screen(),
     )
 
     # 连接关闭信号
