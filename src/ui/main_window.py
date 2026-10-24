@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QPushButton, QLabel, QFrame, QColorDialog,
     QComboBox, QSlider, QMenu, QWidgetAction,
 )
-from PySide6.QtGui import QFont, QColor, QAction, QMouseEvent
+from PySide6.QtGui import QFont, QColor, QAction, QMouseEvent, QIcon, QPixmap
 
 from src.database.db_manager import DatabaseManager
 from src.services.auto_save_service import AutoSaveService
@@ -274,12 +274,27 @@ class StickyNoteWindow(QMainWindow):
 
         highlight_btn = add_btn("🖍", "高亮（选色）", lambda: None)
         highlight_menu = QMenu(highlight_btn)
-        highlight_menu.addAction("无填充", lambda: self._editor.set_highlight(None))
+        highlight_menu.setStyleSheet(
+            "QMenu { background: #ffffff; color: #333;"
+            " border: 0.5px solid rgba(0,0,0,0.25); border-radius: 6px; padding: 4px; }"
+            "QMenu::item { padding: 4px 18px 4px 8px; border-radius: 4px; }"
+            "QMenu::item:selected { background: #E6F1FB; }"
+            "QMenu::separator { height: 1px; background: rgba(0,0,0,0.12); margin: 3px 6px; }"
+        )
+
+        def color_icon(hex_color: str) -> QIcon:
+            pix = QPixmap(12, 12)
+            pix.fill(QColor(hex_color))
+            return QIcon(pix)
+
+        clear_action = highlight_menu.addAction("无填充")
+        clear_action.setIconVisibleInMenu(False)
+        clear_action.triggered.connect(lambda: self._editor.set_highlight(None))
         highlight_menu.addSeparator()
         for name, hex_color in StickyEditor.HIGHLIGHT_COLORS:
-            highlight_menu.addAction(
-                f"● {name}",
-                lambda c=QColor(hex_color): self._editor.set_highlight(c),
+            act = highlight_menu.addAction(color_icon(hex_color), name)
+            act.triggered.connect(
+                lambda c=QColor(hex_color): self._editor.set_highlight(c)
             )
         highlight_btn.setMenu(highlight_menu)
 

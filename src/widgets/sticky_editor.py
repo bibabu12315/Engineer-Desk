@@ -9,7 +9,7 @@ import re
 
 from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtWidgets import QTextEdit, QWidget
-from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor, QColor, QBrush
+from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor, QColor, QBrush, QTextBlockFormat
 
 
 class StickyEditor(QTextEdit):
@@ -84,6 +84,11 @@ class StickyEditor(QTextEdit):
             self.setHtml(text)
         else:
             self.setPlainText(text or "")
+        # 清掉残留的"当前字符格式"，避免光标处继续输入时继承旧高亮/加粗
+        self.setCurrentCharFormat(QTextCharFormat())
+        cursor = self.textCursor()
+        cursor.setBlockFormat(QTextBlockFormat())
+        self.setTextCursor(cursor)
         self.blockSignals(False)
 
     def get_content(self) -> str:
@@ -160,20 +165,27 @@ class StickyEditor(QTextEdit):
         cursor.insertText(new_text)
         cursor.endEditBlock()
 
-    def insert_divider(self) -> None:
-        """光标处插入分割线（红色长划线文本块，另起一段）
+    # 分割线色带（浅蓝，与浅色便签协调）
+    _DIVIDER_COLOR = QColor("#C9DCF0")
 
-        不用 <hr>：QTextEdit 对 <hr> 的块级处理会破坏相邻块的导出。
+    def insert_divider(self) -> None:
+        """光标处插入分割线：空段落 + 段落背景色（全宽色带）
+
+        不用 <hr>：QTextEdit 导出 HTML 时 hr 之后的内容会丢失。
         """
         cursor = self.textCursor()
         cursor.beginEditBlock()
         if cursor.block().text().strip():
             cursor.insertBlock()
-        fmt = QTextCharFormat()
-        fmt.setForeground(QColor("#E24B4A"))
-        cursor.setCharFormat(fmt)
-        cursor.insertText("─" * 24)
-        cursor.insertBlock()
+
+        band = QTextBlockFormat()
+        band.setBackground(self._DIVIDER_COLOR)
+        band.setTopMargin(3)
+        band.setBottomMargin(3)
+        cursor.setBlockFormat(band)  # 当前空块变为色带
+
+        cursor.insertBlock()  # 色带下另起一段
+        cursor.setBlockFormat(QTextBlockFormat())
         cursor.setCharFormat(QTextCharFormat())
         cursor.endEditBlock()
 
