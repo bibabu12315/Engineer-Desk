@@ -135,6 +135,10 @@ class StickyNoteWindow(QMainWindow):
 
         splitter.setSizes([300, 200])
 
+        # 格式工具栏（加粗/斜体/删除线/下划线/高亮/待办/分割线），插在标题栏与内容之间
+        format_bar = self._create_format_bar()
+        main_layout.insertWidget(1, format_bar)
+
         main_layout.addWidget(splitter, 1)
 
         # 底部工具栏
@@ -235,6 +239,41 @@ class StickyNoteWindow(QMainWindow):
         close_btn.clicked.connect(self.hide_to_tray)
         layout.addWidget(close_btn)
 
+        return bar
+
+    def _create_format_bar(self) -> QWidget:
+        """创建格式工具栏（Word 式按钮，无 Markdown 语法记忆负担）"""
+        bar = QWidget()
+        bar.setFixedHeight(28)
+        bar.setStyleSheet("background: transparent;")
+
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setSpacing(4)
+
+        btn_style = (
+            "QPushButton { border: 0.5px solid rgba(0,0,0,0.18); border-radius: 4px;"
+            " background: rgba(255,255,255,0.75); color: #555; font-size: 12px; }"
+            "QPushButton:hover { background: rgba(255,255,255,1); color: #222; }"
+        )
+
+        def add_btn(text: str, tooltip: str, slot, width: int = 26) -> None:
+            btn = QPushButton(text)
+            btn.setFixedSize(width, 22)
+            btn.setToolTip(tooltip)
+            btn.setStyleSheet(btn_style)
+            btn.clicked.connect(slot)
+            layout.addWidget(btn)
+
+        add_btn("B", "加粗", self._editor.toggle_bold)
+        add_btn("I", "斜体", self._editor.toggle_italic)
+        add_btn("S", "删除线", self._editor.toggle_strike)
+        add_btn("U", "下划线", self._editor.toggle_underline)
+        add_btn("🖍", "高亮", self._editor.toggle_highlight)
+        add_btn("☑", "当前行切换为待办行", self._editor.toggle_todo_line)
+        add_btn("⎺", "插入分割线（划出一个可归档的块）", self._editor.insert_divider)
+
+        layout.addStretch()
         return bar
 
     def _create_toolbar(self) -> QWidget:
@@ -467,7 +506,7 @@ class StickyNoteWindow(QMainWindow):
         self._title_edit.setText(note["title"] or "")
 
         self._editor.blockSignals(True)
-        self._editor.setPlainText(note["content"] or "")
+        self._editor.set_content(note["content"] or "")
         self._editor.blockSignals(False)
 
         # 更新标签
@@ -620,7 +659,7 @@ class StickyNoteWindow(QMainWindow):
         self._editor.blockSignals(True)
         self._editor.set_font_family(note["font_family"] or "Microsoft YaHei")
         self._editor.set_font_size(note["font_size"] or 12)
-        self._editor.setPlainText(note["content"] or "")
+        self._editor.set_content(note["content"] or "")
         self._editor.blockSignals(False)
 
         self._apply_bg_style(note["bg_color"] or "#FFFDE7")
@@ -664,7 +703,8 @@ class StickyNoteWindow(QMainWindow):
 
     def _save_all(self) -> None:
         """保存所有数据到数据库"""
-        content = self._editor.get_plain_content()
+        content = self._editor.get_content()
+        plain_text = self._editor.get_plain_content()
 
         self._db.update_note(
             self._note_id,
@@ -681,8 +721,8 @@ class StickyNoteWindow(QMainWindow):
         )
         self._todo_list.save_all()
 
-        # 提取并保存标签
-        tags = self._db.set_tags(self._note_id, content)
+        # 提取并保存标签（从纯文本提取，避免 HTML 标记污染标签）
+        tags = self._db.set_tags(self._note_id, plain_text)
         self._tag_bar.set_tags(tags)
 
         # 刷新缓存

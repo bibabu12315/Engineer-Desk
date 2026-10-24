@@ -1,23 +1,34 @@
 ﻿"""
-便签文本编辑器控件
-基于 QPlainTextEdit，原生支持纯文本换行，粘贴自动去格式
+便签文本编辑器控件（V2.0-a 富文本版）
+基于 QTextEdit：支持加粗/斜体/删除线/下划线/高亮/待办行/分割线
+存储策略：无格式时存纯文本（兼容旧数据），有格式时存 HTML
+粘贴仍强制去格式（丢弃外来富文本）
 """
 
+import re
+
 from PySide6.QtCore import Qt, Signal, QMimeData
-from PySide6.QtWidgets import QPlainTextEdit, QWidget
-from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QTextEdit, QWidget
+from PySide6.QtGui import QFont, QTextCharFormat, QTextCursor, QColor, QBrush
 
 
-class StickyEditor(QPlainTextEdit):
-    """便签文本编辑器（纯文本，无富文本干扰）"""
+class StickyEditor(QTextEdit):
+    """便签编辑器：轻量富文本（按钮驱动，无 Markdown 语法）"""
 
     content_changed = Signal()  # 内容变更信号
+
+    # 高亮颜色（与便签黄底协调）
+    _HIGHLIGHT = QColor("#FFE58F")
+    # 待办行前缀字符
+    _TODO_OPEN = "☐ "
+    _TODO_DONE = "☑ "
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setPlaceholderText("在这里记录今天的想法...")
-        self.setFrameShape(QPlainTextEdit.Shape.NoFrame)
-        self.setStyleSheet("QPlainTextEdit { background: transparent; }")
+        self.setFrameShape(QTextEdit.Shape.NoFrame)
+        self.setStyleSheet("QTextEdit { background: transparent; }")
+        self.setAcceptRichText(True)
 
         # 默认字体
         self._font_family: str = "Microsoft YaHei"
@@ -26,18 +37,19 @@ class StickyEditor(QPlainTextEdit):
 
         self.textChanged.connect(self.content_changed.emit)
 
+    # ==================== 字体 ====================
+
     def _apply_font(self) -> None:
-        """应用字体设置"""
+        """应用字体设置（作为文档默认字体）"""
         font = QFont(self._font_family, self._font_size)
+        self.document().setDefaultFont(font)
         self.setFont(font)
 
     def set_font_family(self, family: str) -> None:
-        """设置字体"""
         self._font_family = family
         self._apply_font()
 
     def set_font_size(self, size: int) -> None:
-        """设置字号"""
         self._font_size = size
         self._apply_font()
 
@@ -49,15 +61,116 @@ class StickyEditor(QPlainTextEdit):
     def font_size(self) -> int:
         return self._font_size
 
-    def set_plain_content(self, text: str) -> None:
-        """设置纯文本内容（不触发变更信号）"""
+    # ==================== 内容读写（HTML / 纯文本自适应） ====================
+
+    @staticmethod
+    def _looks_like_html(text: str) -> bool:
+        """判断存储内容是否含富文本标记"""
+        return bool(
+            re.search(r"<(span|hr|b|i|u|s|strike|font)\b|style\s*=", text, re.IGNORECASE)
+        )
+
+    def set_content(self, text: str) -> None:
+        """设置内容（自动识别 HTML / 纯文本，不触发变更信号）"""
         self.blockSignals(True)
-        self.setPlainText(text)
+        if text and self._looks_like_html(text):
+            self.setHtml(text)
+        else:
+            self.setPlainText(text or "")
         self.blockSignals(False)
 
-    def get_plain_content(self) -> str:
-        """获取纯文本内容"""
+    def get_content(self) -> str:
+        """获取存储内容：有格式存 HTML，无格式存纯文本"""
+        html = self.toHtml()
+        if re.search(
+            r"font-weight\s*:\s*(bold|[6-9]00)|font-style\s*:\s*italic"
+            r"|text-decoration[^;]*underline|text-decoration[^;]*line-through"
+            r"|background-color|color\s*:\s*#(?!(000000|000\b))|<hr\b",
+            html,
+            re.IGNORECASE,
+        ):
+            return html
         return self.toPlainText()
+
+    # 兼容旧接口
+    def set_plain_content(self, text: str) -> None:
+        self.set_content(text)
+
+    def get_plain_content(self) -> str:
+        return self.toPlainText()
+
+    # ==================== 格式操作 ====================
+
+    def _merge_fmt(self, fmt: QTextCharFormat) -> None:
+        self.textCursor().mergeCharFormat(fmt)
+
+    def toggle_bold(self) -> None:
+        fmt = QTextCharFormat()
+        cur = self.textCursor().charFormat()
+        bold = cur.fontWeight() >= QFont.Weight.Bold
+        fmt.setFontWeight(QFont.Weight.Normal if bold else QFont.Weight.Bold)
+        self._merge_fmt(fmt)
+
+    def toggle_italic(self) -> None:
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(not self.textCursor().charFormat().fontItalic())
+        self._merge_fmt(fmt)
+
+    def toggle_underline(self) -> None:
+        fmt = QTextCharFormat()
+        fmt.setFontUnderline(not self.textCursor().charFormat().fontUnderline())
+        self._merge_fmt(fmt)
+
+    def toggle_strike(self) -> None:
+        fmt = QTextCharFormat()
+        fmt.setFontStrikeOut(not self.textCursor().charFormat().fontStrikeOut())
+        self._merge_fmt(fmt)
+
+    def toggle_highlight(self) -> None:
+        fmt = QTextCharFormat()
+        cur = self.textCursor().charFormat().background().color()
+        if cur.isValid() and cur.alpha() > 0:
+            fmt.setBackground(QBrush(Qt.BrushStyle.NoBrush))
+        else:
+            fmt.setBackground(self._HIGHLIGHT)
+        self._merge_fmt(fmt)
+
+    def toggle_todo_line(self) -> None:
+        """当前行切换为待办行：☐ 未完成 / ☑ 完成 / 普通行 三态循环"""
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+        cursor.movePosition(
+            QTextCursor.MoveOperation.EndOfBlock, QTextCursor.MoveMode.KeepAnchor
+        )
+        text = cursor.selectedText()
+        if text.startswith(self._TODO_OPEN):
+            new_text = self._TODO_DONE + text[len(self._TODO_OPEN):]
+        elif text.startswith(self._TODO_DONE):
+            new_text = text[len(self._TODO_DONE):]
+        else:
+            new_text = self._TODO_OPEN + text
+        cursor.insertText(new_text)
+        cursor.endEditBlock()
+
+    def insert_divider(self) -> None:
+        """光标处插入分割线（红色长划线文本块，另起一段）
+
+        不用 <hr>：QTextEdit 对 <hr> 的块级处理会破坏相邻块的导出。
+        """
+        cursor = self.textCursor()
+        cursor.beginEditBlock()
+        if cursor.block().text().strip():
+            cursor.insertBlock()
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor("#E24B4A"))
+        cursor.setCharFormat(fmt)
+        cursor.insertText("─" * 24)
+        cursor.insertBlock()
+        cursor.setCharFormat(QTextCharFormat())
+        cursor.endEditBlock()
+
+    # ==================== 粘贴行为 ====================
 
     def insertFromMimeData(self, source: QMimeData) -> None:
         """重写粘贴行为：只接受纯文本，丢弃所有格式"""

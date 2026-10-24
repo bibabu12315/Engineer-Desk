@@ -123,6 +123,10 @@ class SearchDialog(QDialog):
             date_str = row["date"]
             title = row["title"] or "(无标题)"
             content = row["content"] or ""
+            # 富文本内容先剥掉 HTML 标记再预览
+            if "<" in content and ">" in content:
+                import re
+                content = re.sub(r"<[^>]+>", "", content)
             # 截取前 60 个字作为预览
             preview = content[:60].replace("\n", " ") + ("..." if len(content) > 60 else "")
 
