@@ -144,6 +144,32 @@ class DatabaseManager:
             )
         """)
 
+        # 项目表（V2.0-c）：与按天记录完全隔离，不出现在日期导航和日历里
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                icon TEXT DEFAULT '',
+                note TEXT DEFAULT '',
+                sort_active_at TEXT DEFAULT (datetime('now','localtime')),
+                created_at TEXT DEFAULT (datetime('now','localtime'))
+            )
+        """)
+
+        # 项目子项表：status 0=未开始 1=进行中 2=完成
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                status INTEGER DEFAULT 0,
+                note TEXT DEFAULT '',
+                last_progress TEXT DEFAULT '',
+                updated_at TEXT DEFAULT (datetime('now','localtime')),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            )
+        """)
+
         # 配置表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS config (
@@ -163,6 +189,26 @@ class DatabaseManager:
         if "origin_date" not in columns:
             try:
                 cursor.execute("ALTER TABLE todos ADD COLUMN origin_date TEXT DEFAULT ''")
+                self._conn.commit()
+            except sqlite3.Error:
+                pass
+
+        # V2.0-b：右侧自由草稿区 + 左右分割模式（按天记忆）
+        cursor.execute("PRAGMA table_info(sticky_notes)")
+        note_columns = {row["name"] for row in cursor.fetchall()}
+        if "draft_content" not in note_columns:
+            try:
+                cursor.execute(
+                    "ALTER TABLE sticky_notes ADD COLUMN draft_content TEXT DEFAULT ''"
+                )
+                self._conn.commit()
+            except sqlite3.Error:
+                pass
+        if "split_mode" not in note_columns:
+            try:
+                cursor.execute(
+                    "ALTER TABLE sticky_notes ADD COLUMN split_mode INTEGER DEFAULT 0"
+                )
                 self._conn.commit()
             except sqlite3.Error:
                 pass
@@ -209,7 +255,8 @@ class DatabaseManager:
         """更新便签字段（参数化查询，安全保留换行等特殊字符）"""
         allowed = {
             "title", "content", "font_family", "font_size",
-            "bg_color", "opacity", "width", "height", "pos_x", "pos_y"
+            "bg_color", "opacity", "width", "height", "pos_x", "pos_y",
+            "draft_content", "split_mode",
         }
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
@@ -425,10 +472,11 @@ class DatabaseManager:
             LEFT JOIN note_tags nt ON nt.sticky_note_id = sn.id
             WHERE sn.title LIKE ?
                OR sn.content LIKE ?
+               OR sn.draft_content LIKE ?
                OR nt.tag_name LIKE ?
             ORDER BY sn.date DESC
             LIMIT 50
-        """, (like_pattern, like_pattern, like_pattern))
+        """, (like_pattern, like_pattern, like_pattern, like_pattern))
         return cursor.fetchall()
 
     def search_by_tag(self, tag_name: str) -> list[sqlite3.Row]:
@@ -441,6 +489,102 @@ class DatabaseManager:
             ORDER BY sn.date DESC
         """, (tag_name,))
         return cursor.fetchall()
+
+    # ==================== 项目操作（V2.0-c） ====================
+
+    def get_projects(self) -> list[sqlite3.Row]:
+        """获取所有项目（含完成统计），按最近活跃时间倒序"""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT p.*,
+                   (SELECT COUNT(*) FROM project_items WHERE project_id = p.id) AS total,
+                   (SELECT COUNT(*) FROM project_items
+                     WHERE project_id = p.id AND status = 2) AS done
+            FROM projects p
+            ORDER BY p.sort_active_at DESC, p.id DESC
+        """)
+        return cursor.fetchall()
+
+    def get_project_by_id(self, project_id: int) -> Optional[sqlite3.Row]:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT *, (SELECT COUNT(*) FROM project_items WHERE project_id = ?) AS total,"
+            " (SELECT COUNT(*) FROM project_items WHERE project_id = ? AND status = 2) AS done"
+            " FROM projects WHERE id = ?",
+            (project_id, project_id, project_id),
+        )
+        return cursor.fetchone()
+
+    def create_project(self, name: str, icon: str = "") -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT INTO projects (name, icon) VALUES (?, ?)", (name, icon)
+        )
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def update_project(self, project_id: int, **kwargs) -> None:
+        allowed = {"name", "icon", "note", "sort_active_at"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return
+        set_clause = ", ".join(f"{k} = ?" for k in updates)
+        self.conn.execute(
+            f"UPDATE projects SET {set_clause} WHERE id = ?",
+            (*updates.values(), project_id),
+        )
+        self.conn.commit()
+
+    def touch_project(self, project_id: int) -> None:
+        """刷新项目最近活跃时间（胶囊排序 + ×天没碰 计算）"""
+        self.update_project(
+            project_id, sort_active_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+
+    def delete_project(self, project_id: int) -> None:
+        self.conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+        self.conn.commit()
+
+    def get_project_items(self, project_id: int) -> list[sqlite3.Row]:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT * FROM project_items WHERE project_id = ? ORDER BY id",
+            (project_id,),
+        )
+        return cursor.fetchall()
+
+    def add_project_item(self, project_id: int, title: str) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "INSERT INTO project_items (project_id, title) VALUES (?, ?)",
+            (project_id, title),
+        )
+        self.conn.commit()
+        self.touch_project(project_id)
+        return cursor.lastrowid
+
+    def update_project_item(self, item_id: int, **kwargs) -> None:
+        allowed = {"title", "status", "note", "last_progress"}
+        updates = {k: v for k, v in kwargs.items() if k in allowed}
+        if not updates:
+            return
+        set_parts = [f"{k} = ?" for k in updates]
+        set_parts.append("updated_at = datetime('now','localtime')")
+        set_clause = ", ".join(set_parts)
+        self.conn.execute(
+            f"UPDATE project_items SET {set_clause} WHERE id = ?",
+            (*updates.values(), item_id),
+        )
+        self.conn.commit()
+
+    def get_project_item(self, item_id: int) -> Optional[sqlite3.Row]:
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM project_items WHERE id = ?", (item_id,))
+        return cursor.fetchone()
+
+    def delete_project_item(self, item_id: int) -> None:
+        self.conn.execute("DELETE FROM project_items WHERE id = ?", (item_id,))
+        self.conn.commit()
 
     # ==================== 配置操作 ====================
 

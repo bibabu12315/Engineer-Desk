@@ -127,6 +127,14 @@ class SearchDialog(QDialog):
             if "<" in content and ">" in content:
                 import re
                 content = re.sub(r"<[^>]+>", "", content)
+            # 正文为空时回退显示草稿区内容（V2.0-b 草稿可搜）
+            if not content.strip() and "draft_content" in row.keys():
+                draft = row["draft_content"] or ""
+                if "<" in draft and ">" in draft:
+                    import re
+                    draft = re.sub(r"<[^>]+>", "", draft)
+                if draft.strip():
+                    content = f"[草稿] {draft}"
             # 截取前 60 个字作为预览
             preview = content[:60].replace("\n", " ") + ("..." if len(content) > 60 else "")
 

@@ -16,6 +16,7 @@ class StickyEditor(QTextEdit):
     """便签编辑器：轻量富文本（按钮驱动，无 Markdown 语法）"""
 
     content_changed = Signal()  # 内容变更信号
+    archive_requested = Signal(str)  # 右键分割线块请求归档（携带块纯文本）
 
     # 高亮标准色（荧光笔风格，小巧够用）
     HIGHLIGHT_COLORS: list[tuple[str, str]] = [
@@ -188,3 +189,64 @@ class StickyEditor(QTextEdit):
         """重写粘贴行为：只接受纯文本，丢弃所有格式"""
         if source.hasText():
             self.insertPlainText(source.text())
+
+    # ==================== 分割线块与归档（V2.0-d） ====================
+
+    @staticmethod
+    def _is_divider(text: str) -> bool:
+        """判断一行是否为分割线（连续 ─ 字符）"""
+        stripped = text.strip()
+        return len(stripped) >= 4 and set(stripped) == {"─"}
+
+    def _current_divider_block_text(self) -> str | None:
+        """返回光标所在分割线块（相邻两条分割线之间的内容）的纯文本
+
+        - 光标不在任何块内 / 无分割线 / 光标正压在分割线上：返回 None
+        - 块内保留待办前缀等原始文本
+        """
+        doc = self.document()
+        current_block = self.textCursor().block()
+        blocks = []
+        b = doc.firstBlock()
+        while b.isValid():
+            blocks.append(b)
+            b = b.next()
+
+        # 定位当前块的索引
+        try:
+            idx = next(i for i, blk in enumerate(blocks) if blk.position() == current_block.position())
+        except StopIteration:
+            return None
+
+        if self._is_divider(blocks[idx].text()):
+            return None
+
+        # 向上找最近的分割线，向下找最近的分割线
+        start = 0
+        for i in range(idx - 1, -1, -1):
+            if self._is_divider(blocks[i].text()):
+                start = i + 1
+                break
+        else:
+            start = 0
+        end = len(blocks)
+        for i in range(idx + 1, len(blocks)):
+            if self._is_divider(blocks[i].text()):
+                end = i
+                break
+
+        lines = [blocks[i].text() for i in range(start, end)]
+        text = "\n".join(lines).strip()
+        return text if text else None
+
+    def contextMenuEvent(self, event) -> None:
+        """右键菜单：标准菜单 +（位于分割线块内时）归档到项目"""
+        menu = self.createStandardContextMenu()
+        block_text = self._current_divider_block_text()
+        if block_text is not None:
+            menu.addSeparator()
+            act = menu.addAction("归档到项目 ▾")
+            act.triggered.connect(
+                lambda checked=False, t=block_text: self.archive_requested.emit(t)
+            )
+        menu.exec(event.globalPos())

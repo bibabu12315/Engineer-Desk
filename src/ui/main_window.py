@@ -27,6 +27,7 @@ from src.widgets.todo_widget import TodoListWidget
 from src.widgets.tag_bar import TagBar
 from src.widgets.calendar_dialog import CalendarDialog
 from src.widgets.search_dialog import SearchDialog
+from src.widgets.project_capsule_bar import ProjectCapsuleBar
 from src.ui.settings_dialog import SettingsDialog
 
 
@@ -119,6 +120,7 @@ class StickyNoteWindow(QMainWindow):
 
         self._editor = StickyEditor()
         self._editor.content_changed.connect(self._auto_save.trigger)
+        self._editor.archive_requested.connect(self._archive_block)
         editor_layout.addWidget(self._editor, 1)
 
         # 标签栏
@@ -126,7 +128,20 @@ class StickyNoteWindow(QMainWindow):
         self._tag_bar.tag_clicked.connect(self._on_tag_clicked)
         editor_layout.addWidget(self._tag_bar)
 
-        splitter.addWidget(editor_container)
+        # 左右分割容器（V2.0-b）：左=正文（可归档），右=自由草稿区（不参与归档）
+        self._h_split = QSplitter(Qt.Orientation.Horizontal)
+        self._h_split.setHandleWidth(4)
+        self._h_split.setChildrenCollapsible(False)
+        self._h_split.addWidget(editor_container)
+
+        self._draft_editor = StickyEditor()
+        self._draft_editor.setPlaceholderText("自由草稿区：随手画箭头、涂涂改改、临时算式…")
+        self._draft_editor.content_changed.connect(self._auto_save.trigger)
+        self._h_split.addWidget(self._draft_editor)
+        self._h_split.setSizes([60, 40])
+        self._draft_editor.setVisible(False)  # 默认单栏
+
+        splitter.addWidget(self._h_split)
 
         # Todo 列表
         self._todo_list = TodoListWidget()
@@ -144,6 +159,11 @@ class StickyNoteWindow(QMainWindow):
         # 底部工具栏
         toolbar = self._create_toolbar()
         main_layout.addWidget(toolbar)
+
+        # 项目胶囊条（V2.0-c），置于底部工具栏上方
+        self._capsule_bar = ProjectCapsuleBar()
+        self._capsule_bar.projects_changed.connect(self._on_projects_changed)
+        main_layout.addWidget(self._capsule_bar)
 
         self.setMouseTracking(True)
         central.setMouseTracking(True)
@@ -317,7 +337,33 @@ class StickyNoteWindow(QMainWindow):
         add_btn("☑", "当前行切换为待办行", self._editor.toggle_todo_line)
         add_btn("⎺", "插入分割线（划出一个可归档的块）", self._editor.insert_divider)
 
+        # 左右分割开关（V2.0-b，状态按天记忆）
+        self._split_btn = add_btn("⬌", "切换 单栏 / 左右分区（按天记忆）", self._toggle_split)
+
         return bar
+
+    # ==================== 左右分割（V2.0-b） ====================
+
+    _SPLIT_BTN_ON = (
+        "QPushButton { border: 0.5px solid #BA7517; border-radius: 4px;"
+        " background: #BA7517; color: #fff; font-size: 12px; }"
+    )
+
+    def _toggle_split(self) -> None:
+        self._set_split_mode(not self._draft_editor.isVisible())
+
+    def _set_split_mode(self, on: bool) -> None:
+        """切换单栏 / 左右分割，并随当前便签按天保存"""
+        self._draft_editor.setVisible(on)
+        if on:
+            self._split_btn.setStyleSheet(self._SPLIT_BTN_ON)
+        else:
+            self._split_btn.setStyleSheet(
+                "QPushButton { border: 0.5px solid rgba(0,0,0,0.18); border-radius: 4px;"
+                " background: rgba(255,255,255,0.75); color: #555; font-size: 12px; }"
+                "QPushButton:hover { background: rgba(255,255,255,1); color: #222; }"
+            )
+        self._auto_save.trigger()
 
     def _create_toolbar(self) -> QWidget:
         """创建底部工具栏"""
@@ -389,6 +435,64 @@ class StickyNoteWindow(QMainWindow):
         layout.addWidget(self._save_status)
 
         return bar
+
+    # ==================== 归档到项目（V2.0-d） ====================
+
+    def _archive_block(self, block_text: str) -> None:
+        """分割线块右键归档：选项目/子项，内容追加（复制而非移动），自动带日期"""
+        projects = self._db.get_projects()
+        if not projects:
+            self._save_status.setText("暂无项目：先在底部胶囊条「+ 项目」创建")
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(3000, lambda: self._save_status.setText(""))
+            return
+
+        menu = QMenu(self)
+        date_short = (self._note["date"] or "")[5:]  # MM-DD
+
+        for p in projects:
+            sub = menu.addMenu(f"{p['icon']} {p['name']}".strip())
+
+            act_project = sub.addAction("→ 项目备注")
+            act_project.triggered.connect(
+                lambda checked=False, pid=p["id"], name=p["name"]:
+                self._do_archive_block(pid, 0, name, block_text, date_short)
+            )
+            for item in self._db.get_project_items(p["id"]):
+                act_item = sub.addAction(f"→ 子项：{item['title']}")
+                act_item.triggered.connect(
+                    lambda checked=False, pid=p["id"], iid=item["id"], name=p["name"]:
+                    self._do_archive_block(pid, iid, name, block_text, date_short)
+                )
+
+        menu.exec(self._editor.mapToGlobal(self._editor.cursorRect().bottomRight()))
+
+    def _do_archive_block(self, project_id: int, item_id: int,
+                          project_name: str, block_text: str, date_short: str) -> None:
+        """执行归档：复制内容（带日期）到项目备注或子项备注，原文保留"""
+        entry = f"【{date_short}】{block_text}"
+        if item_id:
+            item = self._db.get_project_item(item_id)
+            old = (item["note"] or "").strip() if item else ""
+            self._db.update_project_item(
+                item_id, note=f"{old}\n{entry}" if old else entry
+            )
+        else:
+            project = self._db.get_project_by_id(project_id)
+            old = (project["note"] or "").strip() if project else ""
+            self._db.update_project(
+                project_id, note=f"{old}\n{entry}" if old else entry
+            )
+        self._db.touch_project(project_id)
+        self._capsule_bar.refresh()
+
+        self._save_status.setText(f"✓ 已归档到「{project_name}」（原文保留）")
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(3000, lambda: self._save_status.setText(""))
+
+    def _on_projects_changed(self) -> None:
+        """项目数据变化（新建/弹窗修改）后的联动刷新"""
+        self._capsule_bar.refresh()
 
     # ==================== 屏幕定位 ====================
 
@@ -552,6 +656,12 @@ class StickyNoteWindow(QMainWindow):
         self._editor.set_content(note["content"] or "")
         self._editor.blockSignals(False)
 
+        # 右侧草稿区 + 分割状态（按天记忆）
+        self._draft_editor.blockSignals(True)
+        self._draft_editor.set_content(note["draft_content"] or "")
+        self._draft_editor.blockSignals(False)
+        self._set_split_mode(bool(note["split_mode"]))
+
         # 更新标签
         self._tag_bar.set_tags(self._db.get_tags(self._note_id))
 
@@ -707,6 +817,12 @@ class StickyNoteWindow(QMainWindow):
         self._editor.set_content(note["content"] or "")
         self._editor.blockSignals(False)
 
+        # 草稿区 + 分割状态（按天记忆）
+        self._draft_editor.blockSignals(True)
+        self._draft_editor.set_content(note["draft_content"] or "")
+        self._draft_editor.blockSignals(False)
+        self._set_split_mode(bool(note["split_mode"]))
+
         self._apply_bg_style(note["bg_color"] or "#FFFDE7")
         self.setWindowOpacity(note["opacity"] or 0.92)
 
@@ -755,6 +871,8 @@ class StickyNoteWindow(QMainWindow):
             self._note_id,
             title=self._title_edit.text().strip(),
             content=content,
+            draft_content=self._draft_editor.get_content(),
+            split_mode=1 if self._draft_editor.isVisible() else 0,
             font_family=self._editor.font_family,
             font_size=self._editor.font_size,
             bg_color=self._extract_bg_color(),
