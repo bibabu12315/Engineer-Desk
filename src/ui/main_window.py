@@ -303,11 +303,14 @@ class StickyNoteWindow(QMainWindow):
 
         clear_action = highlight_menu.addAction("无填充")
         clear_action.setIconVisibleInMenu(False)
-        clear_action.triggered.connect(lambda: apply_highlight(None))
+        clear_action.triggered.connect(lambda checked=False: apply_highlight(None))
         highlight_menu.addSeparator()
         for name, hex_color in StickyEditor.HIGHLIGHT_COLORS:
             act = highlight_menu.addAction(color_icon(hex_color), name)
-            act.triggered.connect(lambda c=QColor(hex_color): apply_highlight(c))
+            # triggered 会带 bool 参数，必须显式接收，否则会顶掉默认的颜色参数
+            act.triggered.connect(
+                lambda checked=False, c=QColor(hex_color): apply_highlight(c)
+            )
         highlight_menu.aboutToShow.connect(snapshot_selection)
         highlight_btn.setMenu(highlight_menu)
 
@@ -698,7 +701,9 @@ class StickyNoteWindow(QMainWindow):
 
         self._editor.blockSignals(True)
         self._editor.set_font_family(note["font_family"] or "Microsoft YaHei")
-        self._editor.set_font_size(note["font_size"] or 12)
+        font_size = note["font_size"]
+        # 历史数据里可能存了 -1，or 判断无法拦截，这里显式兜底
+        self._editor.set_font_size(font_size if font_size and font_size > 0 else 12)
         self._editor.set_content(note["content"] or "")
         self._editor.blockSignals(False)
 
