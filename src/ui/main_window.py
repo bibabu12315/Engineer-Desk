@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QPushButton, QLabel, QFrame, QColorDialog,
     QComboBox, QSlider, QMenu, QWidgetAction,
 )
-from PySide6.QtGui import QFont, QColor, QAction, QMouseEvent, QIcon, QPixmap
+from PySide6.QtGui import QFont, QColor, QAction, QMouseEvent, QIcon, QPixmap, QTextCursor
 
 from src.database.db_manager import DatabaseManager
 from src.services.auto_save_service import AutoSaveService
@@ -281,6 +281,20 @@ class StickyNoteWindow(QMainWindow):
             "QMenu::item:selected { background: #E6F1FB; }"
             "QMenu::separator { height: 1px; background: rgba(0,0,0,0.12); margin: 3px 6px; }"
         )
+        self._hl_cursor: QTextCursor | None = None  # 打开菜单时的选区快照
+
+        def snapshot_selection() -> None:
+            """菜单弹出瞬间保存编辑器选区（菜单抢焦点后选区可能失效）"""
+            cur = self._editor.textCursor()
+            self._hl_cursor = QTextCursor(cur) if cur.hasSelection() else None
+
+        def apply_highlight(color: QColor | None) -> None:
+            """把颜色应用到打开菜单前选中的文字"""
+            if self._hl_cursor is not None:
+                self._editor.setTextCursor(self._hl_cursor)
+            self._editor.set_highlight(color)
+            self._hl_cursor = None
+            self._editor.setFocus()
 
         def color_icon(hex_color: str) -> QIcon:
             pix = QPixmap(12, 12)
@@ -289,13 +303,12 @@ class StickyNoteWindow(QMainWindow):
 
         clear_action = highlight_menu.addAction("无填充")
         clear_action.setIconVisibleInMenu(False)
-        clear_action.triggered.connect(lambda: self._editor.set_highlight(None))
+        clear_action.triggered.connect(lambda: apply_highlight(None))
         highlight_menu.addSeparator()
         for name, hex_color in StickyEditor.HIGHLIGHT_COLORS:
             act = highlight_menu.addAction(color_icon(hex_color), name)
-            act.triggered.connect(
-                lambda c=QColor(hex_color): self._editor.set_highlight(c)
-            )
+            act.triggered.connect(lambda c=QColor(hex_color): apply_highlight(c))
+        highlight_menu.aboutToShow.connect(snapshot_selection)
         highlight_btn.setMenu(highlight_menu)
 
         add_btn("☑", "当前行切换为待办行", self._editor.toggle_todo_line)
