@@ -3,6 +3,8 @@
 使用防抖机制，在用户停止输入指定时间后自动保存数据
 """
 
+from typing import Callable
+
 from PySide6.QtCore import QTimer, QObject
 
 
@@ -18,9 +20,9 @@ class AutoSaveService(QObject):
         self._timer.setSingleShot(True)
         self._timer.setInterval(self._SAVE_INTERVAL_MS)
         self._timer.timeout.connect(self._on_timeout)
-        self._save_callback: callable | None = None
+        self._save_callback: Callable | None = None
 
-    def set_callback(self, callback: callable) -> None:
+    def set_callback(self, callback: Callable) -> None:
         """设置保存回调函数"""
         self._save_callback = callback
 

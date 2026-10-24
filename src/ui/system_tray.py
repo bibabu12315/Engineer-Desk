@@ -3,6 +3,8 @@
 提供系统托盘图标和菜单（显示、退出、设置）
 """
 
+from typing import Callable
+
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 from PySide6.QtGui import QIcon, QAction
@@ -16,15 +18,15 @@ class SystemTray(QObject):
 
     def __init__(
         self,
-        show_callback: callable,
-        exit_callback: callable,
-        center_callback: callable | None = None,
+        show_callback: Callable,
+        exit_callback: Callable,
+        center_callback: Callable | None = None,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
-        self._show_callback: callable = show_callback
-        self._exit_callback: callable = exit_callback
-        self._center_callback: callable = center_callback
+        self._show_callback: Callable = show_callback
+        self._exit_callback: Callable = exit_callback
+        self._center_callback: Callable | None = center_callback
         self._config: ConfigManager = ConfigManager()
 
         self._tray: QSystemTrayIcon = QSystemTrayIcon(self)
