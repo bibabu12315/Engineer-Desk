@@ -5,7 +5,8 @@ Qt.Popup 旗标：Esc 或点击弹窗外部自动关闭；弹窗内所有修改�
 视觉：iOS 质感 — 图标方块头部 / 4px 绿色进度条 / 圆角状态件 / 橙色主操作
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QPainter, QPaintEvent, QPainterPath
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QProgressBar, QFrame, QScrollArea,
@@ -15,7 +16,7 @@ from src.database.db_manager import DatabaseManager
 from src.ui import theme
 
 # 子项三态（status: 0=未开始 1=进行中 2=完成）
-STATUS_TEXT = {0: "", 1: "◐", 2: "✓"}
+STATUS_TEXT = {0: "○", 1: "◐", 2: "✓"}
 # ×天没碰 变橙的阈值
 STALE_DAYS = 7
 
@@ -34,11 +35,6 @@ def days_since(date_str: str) -> int:
     return 0
 
 
-def _date_short(date_str: str) -> str:
-    """'YYYY-MM-DD...' → 'MM-DD'"""
-    return date_str[5:10] if date_str and len(date_str) >= 10 else (date_str or "")
-
-
 class ProjectDialog(QWidget):
     """项目详情弹窗（即时落库，关闭即生效）"""
 
@@ -49,26 +45,42 @@ class ProjectDialog(QWidget):
         self._selected_item_id: int | None = None  # 「记一句进度」目标子项
 
         self.setWindowFlags(Qt.WindowType.Popup)
-        self.setFixedWidth(340)
+        self.setObjectName("projectDialog")
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
+        self.setStyleSheet(
+            f"QWidget#projectDialog {{ background: {theme.BG};"
+            " border-radius: 14px; }"
+        )
+        self.setFixedWidth(328)
 
         self._init_ui()
         self.refresh()
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), 14, 14)
+        painter.fillPath(path, QColor(theme.BG))
+        painter.end()
+        event.accept()
 
     # ==================== UI 构建 ====================
 
     def _init_ui(self) -> None:
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 16, 16, 14)
-        root.setSpacing(6)
+        root.setContentsMargins(14, 14, 14, 14)
+        root.setSpacing(8)
 
         # 头部：图标方块 + 项目名/创建日期 + ×天没碰胶囊
         header = QHBoxLayout()
         header.setSpacing(10)
         self._icon_label = QLabel()
-        self._icon_label.setFixedSize(34, 34)
+        self._icon_label.setFixedSize(38, 38)
         self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._icon_label.setStyleSheet(
-            f"font-size: 17px; background: {theme.ACCENT_SOFT}; border-radius: 10px;"
+            f"font-size: 20px; background: {theme.ACCENT_SOFT}; border-radius: 10px;"
         )
         header.addWidget(self._icon_label)
 
@@ -76,7 +88,7 @@ class ProjectDialog(QWidget):
         title_col.setSpacing(0)
         self._name_label = QLabel()
         self._name_label.setStyleSheet(
-            "font-size: 15px; font-weight: 650; letter-spacing: -0.2px;"
+            "font-size: 14px; font-weight: 700; letter-spacing: -0.2px;"
         )
         self._created_label = QLabel()
         self._created_label.setStyleSheet(f"font-size: 11px; color: {theme.SECONDARY};")
@@ -86,11 +98,10 @@ class ProjectDialog(QWidget):
 
         self._stale_label = QLabel()
         self._stale_label.setStyleSheet(
-            f"font-size: 10px; font-weight: 600; color: {theme.WARN_DEEP};"
-            f" background: {theme.WARN_SOFT}; border-radius: 999px; padding: 2px 8px;"
+            f"font-size: 11px; font-weight: 500; color: {theme.WARN_DEEP};"
+            f" background: {theme.WARN_SOFT}; border-radius: 8px; padding: 5px 10px;"
         )
         self._stale_label.hide()
-        header.addWidget(self._stale_label)
         root.addLayout(header)
 
         # 进度条（4px，绿色）+ 统计行
@@ -98,20 +109,27 @@ class ProjectDialog(QWidget):
         self._progress_bar.setFixedHeight(4)
         self._progress_bar.setTextVisible(False)
         self._progress_bar.setStyleSheet(
-            "QProgressBar { background: rgba(120,120,128,0.08); border: none; border-radius: 2px; }"
-            "QProgressBar::chunk { background: #34C759; border-radius: 2px; }"
+            f"QProgressBar {{ background: {theme.FILL}; border: none; border-radius: 2px; }}"
+            f"QProgressBar::chunk {{ background: {theme.GREEN}; border-radius: 2px; }}"
         )
         root.addWidget(self._progress_bar)
+        root.addWidget(self._stale_label)
         self._progress_label = QLabel()
         self._progress_label.setStyleSheet(
             f"font-size: 11px; color: {theme.SECONDARY};"
         )
+        self._progress_label.hide()
         root.addWidget(self._progress_label)
 
         # 子项滚动区
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollArea > QWidget > QWidget { background: transparent; }"
+        )
+        self._scroll.viewport().setStyleSheet("background: transparent;")
         self._items_container = QWidget()
         self._items_container.setStyleSheet("background: transparent;")
         self._items_layout = QVBoxLayout(self._items_container)
@@ -130,6 +148,7 @@ class ProjectDialog(QWidget):
             f"QPushButton:hover {{ color: {theme.LABEL}; }}"
         )
         self._note_toggle_btn = note_toggle
+        note_toggle.clicked.connect(self._toggle_project_note)
         root.addWidget(note_toggle)
 
         self._project_note_edit = QLineEdit()
@@ -149,17 +168,17 @@ class ProjectDialog(QWidget):
         progress_btn = QPushButton("＋ 记一句进度")
         progress_btn.setToolTip("回车即存：更新选中子项的上次做到，并刷新项目活跃时间")
         progress_btn.setStyleSheet(
-            f"QPushButton {{ border: none; border-radius: 9px; font-size: 11.5px;"
+            f"QPushButton {{ border: none; border-radius: 8px; font-size: 12px;"
             f" font-weight: 600; background: {theme.ACCENT}; color: #FFF; }}"
-            f"QPushButton:hover {{ background: #E88F00; }}"
+            f"QPushButton:hover {{ background: {theme.ACCENT_HOVER}; }}"
         )
         progress_btn.setFixedHeight(30)
         progress_btn.clicked.connect(self._add_progress)
         item_btn = QPushButton("＋ 子项")
         item_btn.setStyleSheet(
-            "QPushButton { border: none; border-radius: 9px; font-size: 11.5px;"
-            f" background: rgba(120,120,128,0.08); color: {theme.LABEL}; }}"
-            f"QPushButton:hover {{ background: rgba(120,120,128,0.16); }}"
+            f"QPushButton {{ border: none; border-radius: 8px; font-size: 12px;"
+            f" background: {theme.FILL}; color: {theme.LABEL}; }}"
+            f"QPushButton:hover {{ background: {theme.FILL2}; }}"
         )
         item_btn.setFixedHeight(30)
         item_btn.clicked.connect(self._add_item)
@@ -200,12 +219,11 @@ class ProjectDialog(QWidget):
 
         self._icon_label.setText(project["icon"] or "📁")
         self._name_label.setText(project["name"])
-        self._created_label.setText(f"创建于 {_date_short(project['created_at'])}")
 
         # × 天没碰（按项目最近活跃时间，≥7 天橙色，仅提示不打断）
         days = days_since(project["sort_active_at"])
         if days >= STALE_DAYS:
-            self._stale_label.setText(f"{days} 天没碰")
+            self._stale_label.setText(f"⚠ {days} 天没碰这个项目了")
             self._stale_label.show()
         else:
             self._stale_label.hide()
@@ -215,8 +233,11 @@ class ProjectDialog(QWidget):
         done = project["done"]
         self._progress_bar.setMaximum(max(total, 1))
         self._progress_bar.setValue(done)
-        recent = _date_short(project["sort_active_at"])
-        self._progress_label.setText(f"{done}/{total} 个子项完成 · 最近 {recent}")
+        self._created_label.setText(
+            f"{done}/{total} · 最近 {days} 天前" if days else f"{done}/{total} · 今天"
+        )
+        self._progress_label.clear()
+        self._progress_label.hide()
 
         # 子项列表
         while self._items_layout.count():
@@ -232,8 +253,15 @@ class ProjectDialog(QWidget):
             )
             self._items_layout.addWidget(empty)
 
-        for row in items:
+        for index, row in enumerate(items):
             self._items_layout.addWidget(self._build_item_row(row))
+            if index < len(items) - 1:
+                separator = QFrame()
+                separator.setFixedHeight(1)
+                separator.setStyleSheet(
+                    f"background: {theme.SEPARATOR}; border: none;"
+                )
+                self._items_layout.addWidget(separator)
 
         # 项目备注回填（保持折叠状态）
         self._project_note_edit.setText(project["note"] or "")
@@ -254,19 +282,19 @@ class ProjectDialog(QWidget):
         bg = theme.BLUE_SOFT if selected else "transparent"
         radius = "border-radius: 10px;" if selected else ""
 
-        # 状态件：20px 圆角方块（空灰 / ◐ 橙 / ✓ 绿）
+        # 状态件：胶囊状态（○ 灰 / ◐ 蓝 / ✓ 绿）
         status = row["status"]
-        state_btn = QPushButton(STATUS_TEXT.get(status, ""))
+        state_btn = QPushButton(STATUS_TEXT.get(status, "○"))
         state_btn.setFixedSize(20, 20)
         state_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         state_style = {
-            0: "background: rgba(120,120,128,0.08);",
-            1: f"background: {theme.WARN_SOFT}; color: {theme.WARN_DEEP};",
+            0: f"background: {theme.FILL}; color: {theme.SECONDARY};",
+            1: f"background: {theme.BLUE_SOFT}; color: {theme.BLUE};",
             2: f"background: {theme.GREEN_SOFT}; color: {theme.GREEN_DEEP};",
         }[status]
         state_btn.setStyleSheet(
             f"QPushButton {{ border: none; font-size: 11px; font-weight: 700;"
-            f" border-radius: 7px; {state_style} }}"
+            f" border-radius: 999px; {state_style} }}"
         )
         state_btn.setToolTip("点击循环切换：未开始 → 进行中 → 完成")
         state_btn.clicked.connect(lambda checked=False, i=item_id: self._cycle_status(i))
@@ -387,6 +415,7 @@ class ProjectDialog(QWidget):
                     break
         if self._selected_item_id is None:
             self._progress_label.setText("先创建一个子项，再记进度")
+            self._progress_label.show()
             return
         self._progress_input.setVisible(True)
         self._progress_input.setFocus()

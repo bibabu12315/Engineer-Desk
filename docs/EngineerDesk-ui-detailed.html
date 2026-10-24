@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineer Desk — 细化版 UI 设计稿（基于 V2.0 现状）</title>
+<style>
+/* ============ 设计令牌：与 src/ui/theme.py 一一对应 ============ */
+:root {
+  --bg: #FFFDF8;            /* PAPER_LIGHT 暖纸白 */
+  --label: #1C1C1E;
+  --secondary: #8E8E93;
+  --tertiary: #C7C7CC;
+  --separator: rgba(60,60,67,0.12);
+  --fill: rgba(120,120,128,0.08);
+  --fill2: rgba(120,120,128,0.16);
+  --accent: #FF9F0A;
+  --accent-soft: #FFF4E0;
+  --accent-hover: #E88F00;
+  --green: #34C759;
+  --green-soft: #E8F8EE;
+  --green-deep: #1B7F3B;
+  --warn-soft: #FFF0DC;
+  --warn-deep: #B26A00;
+  --blue: #007AFF;
+  --blue-soft: #F0F6FF;
+  --red: #FF3B30;
+  --pane-bg: #FBF9F2;
+  --draft-bg: #F4F3EE;
+  --radius-window: 18px;
+  --radius-panel: 12px;
+  --radius-btn: 8px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  background: #F2F1EC; color: var(--label);
+  font-size: 14px; line-height: 1.7;
+}
+.page { max-width: 1120px; margin: 0 auto; padding: 44px 32px 100px; }
+h1 { font-size: 26px; font-weight: 700; }
+p.sub { color: var(--secondary); font-size: 13px; margin: 6px 0 34px; }
+h2 {
+  font-size: 18px; font-weight: 600; margin: 56px 0 6px;
+  padding-left: 11px; border-left: 4px solid var(--accent);
+}
+h2 .en { color: var(--tertiary); font-size: 12px; font-weight: 400; margin-left: 8px; }
+h3 { font-size: 14.5px; font-weight: 600; margin: 26px 0 10px; }
+h2 + p.desc, h3 + p.desc { color: var(--secondary); font-size: 13px; margin-bottom: 14px; }
+.note {
+  background: #fff; border: 0.5px solid var(--separator); border-radius: 12px;
+  padding: 14px 18px; margin: 14px 0; font-size: 13px;
+}
+.note b { color: var(--accent-hover); }
+.spec { font-size: 12.5px; color: var(--secondary); }
+.spec td, .spec th { padding: 6px 10px; border-bottom: 0.5px solid var(--separator); text-align: left; }
+.spec th { color: var(--label); font-weight: 600; font-size: 12px; }
+table { border-collapse: collapse; width: 100%; }
+code {
+  background: #F1EFE8; padding: 1px 6px; border-radius: 4px;
+  font-family: Consolas, monospace; font-size: 12px;
+}
+ul { padding-left: 20px; } li { margin: 4px 0; }
+kbd {
+  background: #F1EFE8; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 4px;
+  padding: 0 6px; font-size: 11.5px; font-family: Consolas, monospace;
+}
+.two-col { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.two-col > div { flex: 1; min-width: 340px; }
+
+/* ============ 便签窗口模拟（真实还原 PySide6 布局） ============ */
+.sticky {
+  background: var(--bg); border-radius: var(--radius-window);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08);
+  width: 430px; overflow: hidden; font-size: 12.5px; position: relative;
+}
+.sticky.tall { height: 560px; display: flex; flex-direction: column; }
+.sticky::after {  /* 窗口外 6px 不可见缩放热区示意 */
+  content: "↔"; position: absolute; right: 3px; bottom: 3px;
+  color: var(--tertiary); font-size: 9px; opacity: .7;
+}
+
+/* 标题栏 */
+.titlebar {
+  display: flex; align-items: center; gap: 4px;
+  height: 36px; padding: 0 4px 0 10px; flex: none;
+}
+.nav-btn {
+  width: 24px; height: 24px; border: none; border-radius: 6px;
+  background: transparent; color: var(--tertiary); font-size: 11px;
+  cursor: default; flex: none;
+}
+.title-edit {
+  flex: 1; border: none; background: transparent; font-weight: 700;
+  font-size: 13px; color: var(--label); min-width: 40px;
+}
+.title-edit.ph { color: var(--tertiary); font-weight: 700; }
+.date-chip {
+  background: var(--fill); border-radius: 999px; padding: 1px 8px;
+  color: var(--secondary); font-size: 10px;
+  font-variant-numeric: tabular-nums; white-space: nowrap; flex: none;
+}
+.icon-btn {
+  width: 26px; height: 26px; border: none; border-radius: 8px;
+  background: transparent; color: var(--secondary); font-size: 13px;
+  flex: none; display: flex; align-items: center; justify-content: center;
+}
+.icon-btn.red { color: var(--red); }
+.icon-btn:hover { background: var(--fill); color: var(--label); }
+.icon-btn.close:hover { background: rgba(255,59,48,0.15); color: var(--red); }
+
+/* 格式工具栏 */
+.format-bar {
+  display: flex; justify-content: flex-end; align-items: center; gap: 4px;
+  height: 28px; padding: 0 10px; flex: none;
+}
+.fbtn {
+  height: 22px; min-width: 26px; border: none; border-radius: 7px;
+  background: transparent; color: var(--secondary); font-size: 12px;
+  display: flex; align-items: center; justify-content: center; padding: 0 5px;
+}
+.fbtn.on { background: var(--accent); color: var(--bg); font-weight: 600; }
+.fbtn:hover { background: var(--fill); color: var(--label); }
+
+/* 编辑器区 */
+.content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.split-wrap { flex: 1; display: flex; gap: 8px; padding: 0 10px; min-height: 0; }
+.pane { border-radius: var(--radius-panel); padding: 4px 8px 8px; display: flex; flex-direction: column; min-height: 0; flex: 1.4; }
+.pane.record { background: var(--pane-bg); }
+.pane.draft { background: var(--draft-bg); flex: 1; }
+.pane-hint { font-size: 10px; color: var(--secondary); padding: 0 4px; }
+.editor { flex: 1; padding: 6px 4px; overflow: hidden; font-size: 12.5px; }
+.editor .ph { color: var(--tertiary); }
+.editor .done { color: var(--secondary); text-decoration: line-through; }
+.editor .todo-line { margin: 2px 0; }
+.divider { color: var(--accent); text-align: center; letter-spacing: 1px; font-size: 11px; margin: 4px 0; user-select: none; }
+.archive-anno { font-size: 10px; color: var(--tertiary); text-align: right; margin-top: -2px; }
+.hl-y { background: #FFF176; } .hl-g { background: #A5D6A7; } .hl-b { background: #90CAF9; }
+.single-editor { flex: 1; padding: 4px 12px; overflow: hidden; }
+
+/* 标签栏 */
+.tagbar { display: flex; align-items: center; gap: 4px; padding: 2px 12px; flex: none; }
+.tag {
+  background: var(--blue-soft); color: var(--blue); border-radius: 999px;
+  font-size: 10.5px; padding: 1px 8px; white-space: nowrap;
+}
+
+/* Todo 区 */
+.todo-section { flex: none; border-top: 0.5px solid var(--separator); }
+.todo-head {
+  display: flex; align-items: center; gap: 6px; padding: 2px 10px; height: 28px;
+}
+.todo-title { color: var(--secondary); font-size: 10px; font-weight: 600; letter-spacing: 1px; }
+.todo-count { color: var(--secondary); font-size: 11px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.add-todo {
+  width: 24px; height: 24px; border: none; border-radius: 8px; background: transparent;
+  color: var(--secondary); font-size: 13px;
+}
+.todo-item { display: flex; align-items: flex-start; gap: 8px; padding: 2px 4px 2px 10px; }
+.ck {
+  width: 17px; height: 17px; border-radius: 5px; border: 1.4px solid var(--tertiary);
+  flex: none; margin-top: 2px; display: flex; align-items: center; justify-content: center;
+}
+.ck.done { background: var(--green); border-color: var(--green); color: #fff; font-size: 11px; }
+.todo-text { flex: 1; font-size: 12.5px; }
+.todo-text.done { color: var(--secondary); text-decoration: line-through; }
+.todo-days { color: var(--tertiary); font-size: 10px; padding: 2px 4px; flex: none; }
+.todo-del { width: 20px; height: 20px; border-radius: 6px; color: var(--tertiary); font-size: 13px; display: flex; align-items: center; justify-content: center; flex: none; }
+.todo-del:hover { background: rgba(255,59,48,0.12); color: var(--red); }
+
+/* 底部工具栏 */
+.bottom-bar {
+  display: flex; align-items: center; gap: 2px; height: 26px;
+  padding: 0 10px; flex: none;
+}
+.link-btn { border: none; background: none; color: var(--secondary); font-size: 10px; }
+.link-btn.blue { color: var(--secondary); }
+.link-btn:hover { color: var(--label); }
+.save-status { margin-left: auto; color: var(--green); font-size: 10px; }
+.center-btn { color: var(--tertiary); font-size: 12px; margin-left: auto; }
+.save-status + .center-btn, .center-btn { margin-left: auto; }
+.save-status { margin-left: 0; }
+
+/* 项目胶囊条 */
+.capsule-bar { display: flex; gap: 4px; padding: 0 8px 4px; flex: none; overflow: hidden; }
+.capsule {
+  border-radius: 999px; padding: 2px 12px; font-size: 11px; font-weight: 500;
+  background: var(--fill); color: var(--label); white-space: nowrap; flex: none;
+}
+.capsule:hover { background: var(--fill2); }
+.capsule.green { background: var(--green-soft); color: var(--green-deep); }
+.capsule.warn { background: var(--warn-soft); color: var(--warn-deep); }
+.capsule.ghost {
+  background: transparent; color: var(--secondary);
+  border: 0.5px dashed var(--tertiary);
+}
+
+/* ============ 弹窗模拟 ============ */
+.dialog {
+  background: var(--bg); border-radius: 14px; width: 340px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.16);
+  padding: 16px; font-size: 13px;
+}
+.group {
+  background: #fff; border: 0.5px solid var(--separator); border-radius: var(--radius-panel);
+  padding: 12px; margin-top: 12px; position: relative;
+}
+.group > .g-title {
+  position: absolute; top: -7px; left: 12px; background: var(--bg);
+  padding: 0 6px; color: var(--secondary); font-size: 11px; font-weight: 600;
+}
+.p-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.p-row label { color: var(--secondary); font-size: 12px; width: 52px; flex: none; }
+.input {
+  flex: 1; border: 0.5px solid var(--separator); border-radius: var(--radius-btn);
+  padding: 4px 8px; font-size: 12px; background: #fff; color: var(--label);
+}
+.input:focus { border: 1px solid var(--accent); outline: none; }
+.btn-secondary {
+  background: var(--fill); color: var(--label); border: none; border-radius: var(--radius-btn);
+  padding: 5px 16px; font-size: 12px; font-weight: 500;
+}
+.btn-primary {
+  background: var(--accent); color: var(--bg); border: none; border-radius: var(--radius-btn);
+  padding: 5px 16px; font-size: 12px; font-weight: 600;
+}
+.swatch { width: 22px; height: 22px; border-radius: 6px; border: 0.5px solid var(--separator); }
+.swatch.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.slider-track { height: 4px; background: var(--fill2); border-radius: 2px; position: relative; flex: 1; }
+.slider-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 72%; background: var(--accent); border-radius: 2px; }
+.slider-knob {
+  position: absolute; left: 72%; top: 50%; transform: translate(-50%, -50%);
+  width: 18px; height: 18px; border-radius: 9px; background: #fff;
+  border: 0.5px solid var(--separator); box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* 项目弹窗 */
+.proj-dialog {
+  background: var(--bg); border-radius: 14px; width: 300px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18); padding: 14px; font-size: 12.5px;
+}
+.proj-head { display: flex; align-items: center; gap: 10px; }
+.proj-icon {
+  width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft);
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.proj-name { font-weight: 700; font-size: 14px; }
+.proj-meta { color: var(--secondary); font-size: 11px; }
+.progress { height: 4px; border-radius: 2px; background: var(--fill2); margin: 10px 0; overflow: hidden; }
+.progress > div { height: 100%; background: var(--green); border-radius: 2px; width: 37.5%; }
+.status-pill { border-radius: 999px; font-size: 10.5px; padding: 1px 8px; }
+.st-0 { background: var(--fill); color: var(--secondary); }
+.st-1 { background: var(--blue-soft); color: var(--blue); }
+.st-2 { background: var(--green-soft); color: var(--green-deep); }
+.proj-item { display: flex; align-items: center; gap: 7px; padding: 5px 0; border-bottom: 0.5px solid var(--separator); }
+.proj-item:last-child { border-bottom: none; }
+.proj-item .t { flex: 1; }
+.proj-item .t.done { color: var(--secondary); text-decoration: line-through; }
+.stale-note {
+  background: var(--warn-soft); color: var(--warn-deep); border-radius: 8px;
+  font-size: 11px; padding: 5px 10px; margin-top: 8px;
+}
+
+/* 搜索弹窗 */
+.search-input { width: 100%; border: 0.5px solid var(--separator); border-radius: var(--radius-btn); padding: 6px 10px; font-size: 12.5px; }
+.search-row { display: flex; gap: 8px; align-items: center; padding: 7px 2px; border-bottom: 0.5px solid var(--separator); font-size: 12.5px; }
+.search-row .d { color: var(--accent-hover); font-variant-numeric: tabular-nums; font-size: 11.5px; width: 74px; flex: none; }
+.search-row .c { flex: 1; color: var(--label); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.search-row .m { color: var(--tertiary); font-size: 10.5px; flex: none; }
+
+/* 日历 */
+.cal { background: #fff; border: 0.5px solid var(--separator); border-radius: 12px; padding: 10px 12px; }
+.cal-nav { display: flex; align-items: center; justify-content: space-between; border-bottom: 0.5px solid var(--separator); padding-bottom: 6px; margin-bottom: 8px; }
+.cal-nav b { font-size: 13px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 11.5px; row-gap: 2px; }
+.cal-grid .wd { color: var(--secondary); font-size: 10px; }
+.cal-d { padding: 3px 0; border-radius: 8px; color: var(--label); }
+.cal-d.dim { color: var(--tertiary); }
+.cal-d.has { background: var(--accent-soft); color: var(--warn-deep); }
+.cal-d.today { background: var(--accent); color: var(--bg); font-weight: 600; }
+
+/* 标注气泡 */
+.anno {
+  position: absolute; background: #333; color: #fff; font-size: 10.5px;
+  border-radius: 6px; padding: 3px 8px; white-space: nowrap; z-index: 5;
+}
+.anno::before { content: ""; position: absolute; border: 4px solid transparent; }
+.anno.t::before { bottom: -8px; left: 12px; border-top-color: #333; }
+.anno.b::before { top: -8px; left: 12px; border-bottom-color: #333; }
+.wrap-anno { position: relative; display: inline-block; }
+
+/* 图例 */
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--secondary); margin: 8px 0 20px; }
+.legend .chip { display: inline-flex; align-items: center; gap: 5px; }
+.legend .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Engineer Desk 细化版 UI 设计稿</h1>
+<p class="sub">依据当前版本源码（main_window / sticky_editor / todo_widget / project_capsule_bar / project_dialog / settings_dialog / search_dialog / calendar_dialog / tag_bar / system_tray / theme.py）逐控件还原 · 2026-10-24</p>
+
+<h2>0. 设计令牌 <span class="en">Design Tokens = theme.py</span></h2>
+<div class="note">
+  设计稿所有颜色 / 圆角均取自 <code>src/ui/theme.py</code> 的浅色令牌，<b>禁止散落硬编码</b>——改主题只改令牌文件。
+</div>
+<table class="spec">
+  <tr><th>令牌</th><th>值</th><th>用途</th></tr>
+  <tr><td><code>BG / PAPER_LIGHT</code></td><td><span class="legend"><span class="dot" style="background:#FFFDF8"></span>#FFFDF8</span></td><td>便签窗口固定底色（暖纸白）</td></tr>
+  <tr><td><code>LABEL / SECONDARY / TERTIARY</code></td><td>#1C1C1E / #8E8E93 / #C7C7CC</td><td>文字三档灰阶</td></tr>
+  <tr><td><code>ACCENT</code></td><td><span class="legend"><span class="dot" style="background:#FF9F0A"></span>#FF9F0A</span></td><td>iOS Orange，唯一强调色（激活按钮 / 主操作 / 分割线）</td></tr>
+  <tr><td><code>GREEN / GREEN_DEEP</code></td><td>#34C759 / #1B7F3B</td><td>Todo 完成勾选框 / 项目全完成胶囊</td></tr>
+  <tr><td><code>WARN_SOFT / WARN_DEEP</code></td><td>#FFF0DC / #B26A00</td><td>「N天没碰」橙色提醒（阈值 7 天）</td></tr>
+  <tr><td><code>BLUE / BLUE_SOFT</code></td><td>#007AFF / #F0F6FF</td><td>顺延按钮 hover / Tag 胶囊</td></tr>
+  <tr><td><code>SEPARATOR</code></td><td>rgba(60,60,67,0.12)</td><td>0.5px 发丝线，替代一切边框</td></tr>
+  <tr><td><code>PANE_BG / DRAFT_BG</code></td><td>#FBF9F2 / #F4F3EE</td><td>分区模式：左记录（暖）/ 右草稿（冷）</td></tr>
+  <tr><td>圆角体系</td><td>窗口 18 / 面板 12 / 按钮 8 / 胶囊 999</td><td>theme.py 注释约定</td></tr>
+</table>
+
+<h2>1. 主窗口 · 单栏模式（默认） <span class="en">430 × 500 默认尺寸，最小 260×260</span></h2>
+<p class="desc">无边框窗口 + 置顶 + 半透明（默认 92%），六边 6px 缩放热区，标题栏整体可拖拽。</p>
+<div class="two-col">
+<div>
+<div class="sticky tall">
+  <!-- 标题栏 -->
+  <div class="titlebar">
+    <div class="nav-btn">◀</div>
+    <div class="nav-btn">▶</div>
+    <div class="title-edit">国网 MPPT 移植</div>
+    <div class="date-chip">10-24 周六</div>
+    <div class="icon-btn">🔍</div>
+    <div class="icon-btn">📅</div>
+    <div class="icon-btn red">📌</div>
+    <div class="icon-btn">⚙</div>
+    <div class="icon-btn close">×</div>
+  </div>
+  <!-- 格式栏 -->
+  <div class="format-bar">
+    <div class="fbtn" style="font-weight:700">B</div>
+    <div class="fbtn" style="font-style:italic">I</div>
+    <div class="fbtn" style="text-decoration:line-through">S</div>
+    <div class="fbtn" style="text-decoration:underline">U</div>
+    <div class="fbtn">🖍</div>
+    <div class="fbtn">☑</div>
+    <div class="fbtn">⎺</div>
+    <div class="fbtn">⬌</div>
+  </div>
+  <!-- 编辑器 -->
+  <div class="content">
+    <div class="single-editor editor">
+      <div>1. mppt 扰动补偿从 10 提高到 30</div>
+      <div class="todo-line">☐ &nbsp;adc 标定 html 封装成通用工具</div>
+      <div class="todo-line done">☑ &nbsp;p 死区 0.05w → 1.8w</div>
+      <div><span class="hl-y">三线程架构：mppt_adc / temp_i2c / mppt_task</span></div>
+      <div class="divider">────────────</div>
+      <div>温度补偿系数待讨论</div>
+      <div class="ph">在这里记录今天的想法...</div>
+    </div>
+    <!-- 标签栏 -->
+    <div class="tagbar" style="padding-left:16px">
+      <span style="font-size:12px">🏷</span>
+      <span class="tag">#mppt</span>
+      <span class="tag">#国网项目</span>
+      <span class="tag">#adc</span>
+    </div>
+  </div>
+  <!-- Todo -->
+  <div class="todo-section">
+    <div class="todo-head">
+      <span class="todo-title">TODO</span>
+      <span class="todo-count">完成 1/3</span>
+      <div class="add-todo">＋</div>
+    </div>
+    <div class="todo-item">
+      <div class="ck done">✓</div><div class="todo-text done">p 死区 0.05w → 1.8w</div><div class="todo-days">4天</div><div class="todo-del">×</div>
+    </div>
+    <div class="todo-item">
+      <div class="ck"></div><div class="todo-text">写晶澳方案文档初稿</div><div class="todo-days"></div><div class="todo-del">×</div>
+    </div>
+    <div class="todo-item">
+      <div class="ck"></div><div class="todo-text">adc 标定工具封装</div><div class="todo-days">2天</div><div class="todo-del">×</div>
+    </div>
+  </div>
+  <!-- 底部工具栏 -->
+  <div class="bottom-bar">
+    <span class="link-btn">＜</span>
+    <span class="link-btn">回到今天</span>
+    <span class="link-btn">＞</span>
+    <span class="link-btn">⏩ 顺延未完成</span>
+    <span class="center-btn">⛶</span>
+    <span class="save-status">✓ 已保存</span>
+  </div>
+  <!-- 项目胶囊条 -->
+  <div class="capsule-bar">
+    <span class="capsule">🎯 RT-Thread 3/8</span>
+    <span class="capsule warn">⚡ 国网MPPT 1/4 · 9天没碰</span>
+    <span class="capsule green">🚗 买车功课 2/2</span>
+    <span class="capsule ghost">+ 项目</span>
+  </div>
+</div>
+<p class="spec" style="margin-top:10px">▲ 单栏默认视图（保存状态、⛶、置顶钉三处细节见 §3 交互）</p>
+</div>
+
+<div>
+<h3>1.1 标题栏（36px）</h3>
+<ul>
+  <li><b>◀ ▶ 历史导航</b>：跳到相邻<b>有记录</b>的日期；无相邻记录时按钮置灰（rgba 0.4）。</li>
+  <li><b>标题</b>：无框 QLineEdit，占位「标题」，加粗 13px，输入即触发自动保存。</li>
+  <li><b>日期胶囊</b>：格式 <code>MM-DD 周X</code>，等宽数字（tabular-nums），切日期自动刷新。</li>
+  <li><b>🔍 搜索</b>：弹搜索对话框（§6）；<b>📅 日历</b>：弹日历（§7）。</li>
+  <li><b>📌 置顶钉</b>：钉住 = 红色 📌；未钉 = 灰色 📍；状态持久化。</li>
+  <li><b>⚙ 设置</b>：弹设置对话框（§8）；<b>×</b>：隐藏到托盘（不是退出），hover 红底。</li>
+</ul>
+<h3>1.2 格式工具栏（28px，按钮靠右，Word 式零记忆负担）</h3>
+<ul>
+  <li><b>B / I / S / U</b>：加粗、斜体、删除线、下划线，作用于选区。</li>
+  <li><b>🖍 高亮</b>：下弹 6 色色板（黄 #FFF176 / 绿 #A5D6A7 / 蓝 #90CAF9 / 粉 #F48FB1 / 橙 #FFB74D / 紫 #CE93D8）+「无填充」；菜单弹出瞬间快照选区，防止菜单抢焦点丢选区。</li>
+  <li><b>☑ 待办行</b>：当前行三态循环 ☐ → ☑ → 普通行。</li>
+  <li><b>⎺ 分割线</b>：插入 12 个 <code>─</code>（品牌橙 #FF9F0A、居中、另起段）；<b>刻意不用 <code>&lt;hr&gt;</code></b>，因 QTextEdit 导出 HTML 时 hr 后内容会丢失。</li>
+  <li><b>⬌ 分区开关</b>：单栏 / 左右分区切换，激活态橙底（全应用唯二用强调色的按钮之一）；状态<b>按天记忆</b>。</li>
+</ul>
+<h3>1.3 编辑器行为（StickyEditor）</h3>
+<ul>
+  <li>存储自适应：有格式存 HTML，纯文本存纯文本（兼容旧数据）。</li>
+  <li><b>粘贴强制去格式</b>：只接受纯文本，丢弃外来富文本。</li>
+  <li><b>分割线划块</b>：两条分割线之间的内容是一个「块」；光标在块内时右键菜单追加「<b>归档到项目 ▾</b>」，复制块文本（带 MM-DD 日期前缀）到项目备注或子项备注，<b>原文保留</b>。</li>
+  <li>标签自动提取：保存时从纯文本抓取 <code>#Tag</code>，显示在编辑器下方标签栏，点击标签直接打开搜索。</li>
+</ul>
+</div>
+</div>
+
+<h2>2. 主窗口 · 左右分区模式 <span class="en">⬌ 手动切换</span></h2>
+<p class="desc">左 = 记录（可归档），右 = 自由草稿区（不参与归档）；默认比例 60 : 40，可拖分割条；各自独立自动保存与搜索。</p>
+<div style="display:flex; justify-content:center">
+<div class="sticky" style="width:640px; height:420px; display:flex; flex-direction:column">
+  <div class="titlebar">
+    <div class="nav-btn">◀</div><div class="nav-btn">▶</div>
+    <div class="title-edit">10月24日</div>
+    <div class="date-chip">10-24 周六</div>
+    <div class="icon-btn">🔍</div><div class="icon-btn">📅</div><div class="icon-btn red">📌</div><div class="icon-btn">⚙</div><div class="icon-btn close">×</div>
+  </div>
+  <div class="format-bar">
+    <div class="fbtn">B</div><div class="fbtn">I</div><div class="fbtn">🖍</div><div class="fbtn">☑</div><div class="fbtn">⎺</div>
+    <div class="fbtn on">⬌</div>
+  </div>
+  <div class="content">
+    <div class="split-wrap">
+      <div class="pane record">
+        <div class="pane-hint">记录 · 右键分割线块可归档</div>
+        <div class="editor">
+          <div>1. mppt 扰动补偿从 10 提高到 30</div>
+          <div class="todo-line done">☑ p 死区 0.05w → 1.8w</div>
+          <div class="divider">────────────</div>
+          <div>adc 标定 html 封装成通用工具</div>
+          <div class="archive-anno">右键 → 归档到项目 ▾</div>
+          <div class="ph" style="margin-top:8px">继续随手写...</div>
+        </div>
+      </div>
+      <div class="pane draft">
+        <div class="pane-hint">草稿 · 自动保存可搜索</div>
+        <div class="editor">
+          <div class="ph">自由草稿区：随手画箭头、涂涂改改、临时算式…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="todo-section">
+    <div class="todo-head"><span class="todo-title">TODO</span><span class="todo-count">完成 1/3</span><div class="add-todo">＋</div></div>
+    <div class="todo-item"><div class="ck done">✓</div><div class="todo-text done">p 死区 0.05w → 1.8w</div><div class="todo-days">4天</div><div class="todo-del">×</div></div>
+  </div>
+  <div class="bottom-bar">
+    <span class="link-btn">＜</span><span class="link-btn">回到今天</span><span class="link-btn">＞</span><span class="link-btn">⏩ 顺延未完成</span>
+    <span class="center-btn">⛶</span><span class="save-status">✓ 已保存</span>
+  </div>
+  <div class="capsule-bar">
+    <span class="capsule">🎯 RT-Thread 3/8</span><span class="capsule ghost">+ 项目</span>
+  </div>
+</div>
+</div>
+<div class="note" style="margin-top:14px">
+  <b>面板化规则</b>：分区时左暖（<code>PANE_BG</code>）右冷（<code>DRAFT_BG</code>）两块 12px 圆角面板，面板顶部各显示一条 10px 微标注；单栏时面板透明、标注隐藏，与旧版视觉完全一致。
+</div>
+
+<h2>3. 底部工具栏 · 项目胶囊条 <span class="en">26px + 30px</span></h2>
+<div class="two-col">
+<div>
+  <h3>3.1 底部工具栏（左导航 / 右状态）</h3>
+  <ul>
+    <li><b>＜ 回到今天 ＞</b>：文字链式按钮，与标题栏 ◀▶ 同逻辑但更轻。</li>
+    <li><b>⏩ 顺延未完成</b>：把当前日期所有未完成 Todo 复制到<b>下一自然日</b>，状态栏提示「已顺延 N 项」。</li>
+    <li><b>⛶ 居中按钮</b>：一键把窗口移回主屏中央——兜底「外接屏拔掉后窗口找不到」；程序还监听 <code>screenRemoved</code> 自动回收，跨屏时按 DPR 补偿保持<b>物理尺寸</b>不变。</li>
+    <li><b>保存状态</b>：绿色「✓ 已保存」（2 秒淡出）、「已顺延 N 项」（3 秒）、「✓ 已归档到『XX』（原文保留）」。</li>
+  </ul>
+  <h3>3.2 项目胶囊条</h3>
+  <ul>
+    <li>每颗胶囊 = <code>图标 名称 完成/总数</code>，按<b>最近活跃时间</b>排序；超过 6 个横向滚动，无硬上限。</li>
+    <li><b>三态配色</b>：常规灰 / 全完成绿底 / ≥7 天未碰橙底并追加「· N天没碰」。</li>
+    <li><b>左键</b>点胶囊在正下方弹项目弹窗（§5），再点同胶囊收起；<b>右键</b>弹删除菜单（确认后级联删除子项）。</li>
+    <li><b>+ 项目</b>：虚线 ghost 胶囊，点开主题化输入弹层，可从 12 个常用 emoji 图标中选择，也可在名称前直接输入 emoji；回车创建，Esc / 点外部收起不创建。</li>
+  </ul>
+</div>
+<div>
+  <h3>胶囊三态示例（放大 1.4x）</h3>
+  <div class="sticky" style="width:auto; padding:14px; display:flex; flex-direction:column; gap:8px">
+    <div><span class="capsule">🎯 RT-Thread 3/8</span> <span class="spec">base：进行中</span></div>
+    <div><span class="capsule green">🚗 买车功课 2/2</span> <span class="spec">green：全部完成</span></div>
+    <div><span class="capsule warn">⚡ 国网MPPT 1/4 · 9天没碰</span> <span class="spec">warn：≥7 天未活跃</span></div>
+    <div><span class="capsule ghost">+ 项目</span> <span class="spec">ghost：新建入口</span></div>
+  </div>
+</div>
+</div>
+
+<h2>4. 归档到项目（分割线块右键） <span class="en">V2.0-d</span></h2>
+<div class="note">
+  流程：光标落在分割线块内 → 右键 → 「归档到项目 ▾」 → 弹两级菜单：<b>项目 →（项目备注 / 各子项）</b> → 写入格式 <code>【MM-DD】块文本</code>，<b>追加</b>到目标备注末尾，原文留在便签。无项目时状态栏提示先去胶囊条创建。归档后项目胶囊立即刷新活跃时间。
+</div>
+
+<h2>5. 项目弹窗 <span class="en">点胶囊弹出，Esc/点外部关闭</span></h2>
+<div class="two-col">
+<div>
+<div class="proj-dialog">
+  <div class="proj-head">
+    <div class="proj-icon">⚡</div>
+    <div>
+      <div class="proj-name">国网 MPPT 移植</div>
+      <div class="proj-meta">1/4 · 最近 9 天前</div>
+    </div>
+  </div>
+  <div class="progress"><div></div></div>
+  <div class="stale-note">⚠ 9 天没碰这个项目了</div>
+  <div style="margin-top:10px">
+    <div class="proj-item"><span class="status-pill st-2">✓</span><span class="t done">三线程架构梳理</span></div>
+    <div class="proj-item"><span class="status-pill st-1">◐</span><span class="t">1901 代码移植</span></div>
+    <div class="proj-item"><span class="status-pill st-0">○</span><span class="t">功率侧方案文档</span></div>
+    <div class="proj-item"><span class="status-pill st-0">○</span><span class="t">联调测试用例</span></div>
+  </div>
+  <div style="display:flex; gap:8px; margin-top:12px">
+    <div class="input" style="flex:1; color:var(--tertiary)">＋ 记一句进度…</div>
+    <div class="btn-primary" style="flex:none; padding:5px 12px">＋ 子项</div>
+  </div>
+</div>
+</div>
+<div>
+  <ul>
+    <li><b>头部</b>：emoji 图标方块（accent-soft 底）+ 项目名 +「完成/总数 · 最近 N 天前」。</li>
+    <li><b>进度条</b>：4px 绿条，按完成比例填充。</li>
+    <li><b>子项三态</b>：<code>○ 未开始 / ◐ 进行中 / ✓ 完成</code>，点状态件循环切换，点击后即时落库。</li>
+    <li><b>两级备注</b>：项目级备注 + 每个子项备注，归档的带日期记录都落在这里；「记一句进度」快速追加。</li>
+    <li><b>×天没碰</b>：≥7 天显示橙色提示条，胶囊同步变橙——对抗「项目悄悄死掉」。</li>
+    <li>所有修改即时写库，无保存按钮。</li>
+  </ul>
+</div>
+</div>
+
+<h2>6. 搜索对话框 <span class="en">🔍，440×500</span></h2>
+<div class="two-col">
+<div>
+<div class="dialog">
+  <div style="display:flex; gap:8px">
+    <input class="search-input" style="flex:1" placeholder="搜索标题与正文…">
+    <div class="btn-primary">搜索</div>
+  </div>
+  <div style="display:flex; gap:6px; margin:10px 0; flex-wrap:wrap">
+    <span class="capsule" style="font-size:10.5px; padding:1px 9px">#mppt</span>
+    <span class="capsule" style="font-size:10.5px; padding:1px 9px">#国网项目</span>
+    <span class="capsule" style="font-size:10.5px; padding:1px 9px">#adc</span>
+    <span class="capsule ghost" style="font-size:10.5px; padding:1px 9px">🏷 按标签筛选</span>
+  </div>
+  <div style="border-top:0.5px solid var(--separator)">
+    <div class="search-row"><span class="d">10-24 周六</span><span class="c">…mppt 扰动补偿从 10 提高到 30</span><span class="m">标题·3条</span></div>
+    <div class="search-row"><span class="d">10-21 周三</span><span class="c">…三线程架构：mppt_adc / temp…</span><span class="m">标题·1条</span></div>
+    <div class="search-row"><span class="d">10-18 周日</span><span class="c">…【10-18】adc 标定 html 封装…</span><span class="m">项目备注</span></div>
+  </div>
+</div>
+</div>
+<div>
+  <ul>
+    <li>全文搜标题 + 正文（HTML 剥离后搜纯文本），草稿区内容同样可搜——对应「草稿必须可回顾」的设计原则。</li>
+    <li>顶部 <b>Tag 胶囊</b>横向排列，点一颗即按标签过滤；主窗口标签栏点标签也会跳到这里并直接执行搜索。</li>
+    <li>结果行 = 日期胶囊（橙）+ 命中片段（省略号截断）+ 来源标记；点击行跳转加载对应日期便签。</li>
+  </ul>
+</div>
+</div>
+
+<h2>7. 日历对话框 <span class="en">📅，380×400</span></h2>
+<div class="two-col">
+<div>
+<div class="dialog" style="width:300px">
+  <div class="cal">
+    <div class="cal-nav"><span>◀</span><b>2026年 10月</b><span>▶</span></div>
+    <div class="cal-grid">
+      <span class="wd">日</span><span class="wd">一</span><span class="wd">二</span><span class="wd">三</span><span class="wd">四</span><span class="wd">五</span><span class="wd">六</span>
+      <span class="cal-d dim">27</span><span class="cal-d dim">28</span><span class="cal-d dim">29</span><span class="cal-d dim">30</span>
+      <span class="cal-d has">1</span><span class="cal-d has">2</span><span class="cal-d">3</span>
+      <span class="cal-d has">4</span><span class="cal-d has">5</span><span class="cal-d">6</span><span class="cal-d has">7</span><span class="cal-d has">8</span><span class="cal-d">9</span><span class="cal-d has">10</span>
+      <span class="cal-d has">11</span><span class="cal-d has">12</span><span class="cal-d">13</span><span class="cal-d has">14</span><span class="cal-d has">15</span><span class="cal-d has">16</span><span class="cal-d has">17</span>
+      <span class="cal-d has">18</span><span class="cal-d has">19</span><span class="cal-d has">20</span><span class="cal-d has">21</span><span class="cal-d has">22</span><span class="cal-d has">23</span><span class="cal-d today">24</span>
+      <span class="cal-d">25</span><span class="cal-d">26</span><span class="cal-d">27</span><span class="cal-d">28</span><span class="cal-d">29</span><span class="cal-d">30</span><span class="cal-d">31</span>
+    </div>
+  </div>
+  <div style="display:flex; justify-content:space-between; margin-top:10px">
+    <span class="spec">🟧 有记录 · ■ 今天</span>
+    <div class="btn-primary">回到今天</div>
+  </div>
+</div>
+</div>
+<div>
+  <ul>
+    <li>iOS 卡片质感：去网格线、导航条融入卡片、月份切换自动刷新高亮。</li>
+    <li><b>有记录的日期</b>：橙色软底（accent-soft）+ 深橙字；今天：橙色实底白字。</li>
+    <li>点日期跳转加载该天便签；「回到今天」按钮兜底。</li>
+  </ul>
+</div>
+</div>
+
+<h2>8. 设置对话框 <span class="en">⚙</span></h2>
+<div class="two-col">
+<div>
+<div class="dialog" style="width:360px">
+  <div class="group"><span class="g-title">字体</span>
+    <div class="p-row"><label>字体</label>
+      <div class="input" style="display:flex; justify-content:space-between">Microsoft YaHei <span>▾</span></div>
+    </div>
+    <div class="p-row"><label>字号</label>
+      <div class="input" style="display:flex; justify-content:space-between">12 <span>▾</span></div>
+    </div>
+  </div>
+  <div class="group"><span class="g-title">外观</span>
+    <div class="p-row"><label>透明度</label>
+      <div class="slider-track"><div class="slider-fill"></div><div class="slider-knob"></div></div>
+      <span class="spec">92%</span>
+    </div>
+    <div class="p-row" style="align-items:flex-start"><label style="margin-top:4px">背景色</label>
+      <div style="display:flex; gap:6px; flex-wrap:wrap">
+        <div class="swatch" style="background:#FDFBF7"></div><div class="swatch" style="background:#FBF6E8"></div>
+        <div class="swatch" style="background:#FDF6E3"></div><div class="swatch" style="background:#FFFFF0"></div>
+        <div class="swatch" style="background:#F5F5F5"></div><div class="swatch" style="background:#F0F0F0"></div>
+        <div class="swatch" style="background:#FFF8E7"></div><div class="swatch" style="background:#F9F4E8"></div>
+        <div class="swatch" style="background:#F0F7ED"></div><div class="swatch" style="background:#F0F5FA"></div>
+        <div class="swatch" style="background:#FBF0F0"></div><div class="swatch sel" style="background:#FFFDF8"></div>
+        <div class="swatch" style="background:#2D2D2D"></div>
+      </div>
+    </div>
+  </div>
+  <div class="group"><span class="g-title">系统</span>
+    <div class="p-row"><input type="checkbox" checked style="accent-color:var(--accent)"> <span style="font-size:12.5px">开机自动启动</span></div>
+  </div>
+  <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px">
+    <div class="btn-secondary">恢复默认</div><div class="btn-primary">完成</div>
+  </div>
+</div>
+</div>
+<div>
+  <ul>
+    <li><b>字体 / 字号</b>：即时生效并随当天便签持久化；历史数据存了 -1 时字号兜底 12。</li>
+    <li><b>透明度</b>：滑块 50–100%，默认 92%。</li>
+    <li><b>背景色</b>：12 个预设柔和色 + 自定义拾色；默认便签底色固定为暖白，用户自定义色原样保留不被覆盖。</li>
+    <li><b>开机启动</b>：写入系统启动项。</li>
+    <li>全部走 <code>dialog_qss()</code> 卡片化皮肤：圆角输入框聚焦橙描边、滑块橙色轨道。</li>
+  </ul>
+</div>
+</div>
+
+<h2>9. 系统层行为 <span class="en">托盘 / 窗口管理</span></h2>
+<div class="note">
+  <ul>
+    <li><b>系统托盘</b>：左键点图标显示窗口；菜单含「显示 / 移到主屏中央 / 设置 / 退出」。<b>关窗 ≠ 退出</b>（× 只隐藏到托盘），真正退出走托盘菜单。</li>
+    <li><b>自动保存</b>：编辑防抖触发，切日期 / 隐藏 / 关闭 / 拖拽缩放结束均强制落库；标题栏、正文、草稿、Todo、标签、窗口位置尺寸全量保存。</li>
+    <li><b>多屏健壮性</b>：启动与拔屏后检查窗口是否在任何屏幕可视区内，不在则静默移回主屏中央（不弹出、不打断托盘隐藏状态）；跨屏按 DPR 比值补偿尺寸，物理大小不变。</li>
+    <li><b>深浅色</b>：启动读系统 ColorScheme，系统切换即时刷新 chrome；便签底色在下次加载便签时生效。</li>
+  </ul>
+</div>
+
+<h2>10. 状态与边界一览 <span class="en">实现时逐条对照</span></h2>
+<table class="spec">
+  <tr><th>场景</th><th>表现</th></tr>
+  <tr><td>无项目时归档</td><td>状态栏提示「暂无项目：先在底部胶囊条『+ 项目』创建」，3 秒淡出</td></tr>
+  <tr><td>删除项目</td><td>右键胶囊 → 确认弹窗（红字警示级联删除）→ 弹窗开着则先关闭 → 刷新</td></tr>
+  <tr><td>光标在分割线上</td><td>右键<b>不出现</b>归档项（块定位为 None）</td></tr>
+  <tr><td>首次进入日期无记录</td><td>自动创建当天记录，编辑器显示占位文案</td></tr>
+  <tr><td>◀▶ 无相邻记录</td><td>导航按钮置灰（不可点）</td></tr>
+  <tr><td>顺延无未完成项</td><td>状态栏「没有未完成的任务」，2 秒淡出</td></tr>
+  <tr><td>新建项目输入含 emoji</td><td>首字符自动拆为项目图标</td></tr>
+  <tr><td>Todo 多行内容</td><td>行高随内容自适应（30–300px），文本域无滚动条</td></tr>
+</table>
+
+</div>
+</body>
+</html>

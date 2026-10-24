@@ -302,14 +302,18 @@ class TodoListWidget(QWidget):
         self._update_count()
         self.todo_changed.emit()
 
-    def _on_item_changed(self) -> None:
-        """Todo 项变更时保存"""
+    def save_all(self) -> None:
+        """保存所有 Todo 项"""
         for item in self._items:
             self._db.update_todo(
                 item.todo_id,
                 content=item.text(),
                 completed=1 if item.is_completed else 0,
             )
+
+    def _on_item_changed(self) -> None:
+        """Todo 项变更时保存"""
+        self.save_all()
         self._update_count()
         self.todo_changed.emit()
 

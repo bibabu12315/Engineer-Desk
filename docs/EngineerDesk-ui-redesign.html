@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineer Desk · UI 设计稿 — iOS 质感重设计</title>
+<style>
+  :root {
+    --bg: #F2F2F7;          /* iOS systemGroupedBackground */
+    --card: #FFFFFF;
+    --label: #1C1C1E;       /* iOS label */
+    --secondary: #8E8E93;   /* iOS secondaryLabel */
+    --tertiary: #C7C7CC;
+    --separator: rgba(60,60,67,0.12);
+    --accent: #FF9F0A;      /* iOS orange（呼应便签的暖黄基因） */
+    --accent-soft: #FFF4E0;
+    --blue: #007AFF;
+    --green: #34C759;
+    --red: #FF3B30;
+    --fill: rgba(120,120,128,0.08);  /* iOS systemFill */
+    --fill2: rgba(120,120,128,0.16);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--label);
+    line-height: 1.7; font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1020px; margin: 0 auto; padding: 48px 32px 96px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 6px; }
+  h2 { font-size: 19px; font-weight: 600; margin: 56px 0 6px; letter-spacing: -0.3px; }
+  h3 { font-size: 14px; font-weight: 600; margin: 24px 0 10px; }
+  p.sub { color: var(--secondary); font-size: 13px; margin-bottom: 28px; }
+  .lead { color: var(--secondary); font-size: 14px; margin: 4px 0 0; }
+
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px;
+    margin: 14px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+  }
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 600;
+    padding: 2px 10px; border-radius: 999px;
+    background: var(--accent-soft); color: #B26A00;
+    margin-right: 6px; vertical-align: 2px;
+  }
+  .tag.blue { background: #E5F1FF; color: #0071E3; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 0.5px solid var(--separator); vertical-align: top; }
+  th { color: var(--secondary); font-weight: 500; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  code {
+    background: var(--fill); padding: 1px 7px; border-radius: 5px;
+    font-family: "SF Mono", Consolas, monospace; font-size: 12px;
+  }
+  ul { padding-left: 20px; } li { margin: 5px 0; }
+  .grid { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .anno { font-size: 12px; color: var(--secondary); }
+  .kbd {
+    background: var(--fill); border: 0.5px solid var(--fill2);
+    border-radius: 5px; padding: 0 6px; font-size: 12px;
+    font-family: "SF Mono", Consolas, monospace;
+  }
+
+  /* ================= 便签 Mock ================= */
+  .phone-frame {
+    background: linear-gradient(160deg, #EDEEF3, #E2E4EA);
+    border-radius: 24px; padding: 22px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+  }
+  .note {
+    width: 420px; border-radius: 18px; overflow: hidden;
+    background: #FFFDF8;
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.06), 0 12px 32px rgba(0,0,0,0.10);
+  }
+
+  .n-titlebar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px 8px;
+  }
+  .n-titlebar .grip { width: 34px; height: 4px; border-radius: 2px; background: var(--fill2); margin: 0 auto; }
+  .n-title {
+    flex: 1; font-size: 14px; font-weight: 600; letter-spacing: -0.2px;
+  }
+  .icon-btn {
+    width: 26px; height: 26px; border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--secondary);
+    background: transparent;
+  }
+  .icon-btn:hover { background: var(--fill); }
+  .icon-btn.active { background: var(--accent); color: #fff; }
+  .date-chip {
+    font-size: 10px; color: var(--secondary);
+    background: var(--fill); border-radius: 999px; padding: 1px 8px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .n-formatbar {
+    display: flex; align-items: center; gap: 4px;
+    padding: 0 14px 8px; border-bottom: 0.5px solid var(--separator);
+  }
+  .f-btn {
+    min-width: 26px; height: 24px; padding: 0 7px;
+    border-radius: 7px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11.5px; color: var(--secondary); background: transparent;
+  }
+  .f-btn:hover { background: var(--fill); }
+  .f-btn.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .f-sep { width: 0.5px; height: 14px; background: var(--separator); margin: 0 3px; }
+  .f-spacer { flex: 1; }
+
+  .n-body { padding: 12px 16px 8px; font-size: 13px; min-height: 150px; }
+  .n-body .todo-row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+  .chk {
+    width: 15px; height: 15px; border-radius: 5px; flex: none;
+    border: 1.5px solid var(--tertiary); position: relative; top: 2px;
+  }
+  .chk.done { background: var(--green); border-color: var(--green); }
+  .chk.half { border-color: var(--accent); background: var(--accent-soft); }
+  .done-text { color: var(--secondary); text-decoration: line-through; }
+  .divider {
+    display: flex; align-items: center; gap: 8px; margin: 10px 0; color: #FF9F0A;
+  }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 0.5px; background: #FFD9A0; }
+  .divider span { font-size: 9px; letter-spacing: 2px; color: #E8A94E; }
+  .n-split { display: flex; gap: 10px; padding: 12px 12px 8px; min-height: 150px; }
+  .pane {
+    flex: 1.4; border-radius: 12px; background: #FBF9F2; padding: 10px 12px; font-size: 13px;
+  }
+  .pane.draft { flex: 1; background: #F4F3EE; color: #6E6D6A; }
+  .pane-label { font-size: 10px; color: var(--secondary); margin-bottom: 4px; display: flex; justify-content: space-between; }
+
+  .n-bottombar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 12px 12px;
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 24px; padding: 0 11px; border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    background: var(--fill); color: var(--label);
+    white-space: nowrap;
+  }
+  .pill.green { background: #E8F8EE; color: #1B7F3B; }
+  .pill.warn  { background: #FFF0DC; color: #B26A00; }
+  .pill.ghost { background: transparent; color: var(--secondary); border: 0.5px dashed var(--tertiary); }
+  .pill.blue  { background: #E5F1FF; color: #0071E3; }
+  .capsule-scroll { flex: 1; display: flex; gap: 6px; overflow: hidden; justify-content: flex-end; }
+
+  /* ================= 弹窗 Mock ================= */
+  .proj-pop {
+    width: 330px; border-radius: 18px; background: #FFFFFF; color: var(--label);
+    box-shadow: 0 0 0 0.5px rgba(0,0,0,0.08), 0 24px 60px rgba(0,0,0,0.18);
+    padding: 18px 16px 14px;
+  }
+  .pp-head { display: flex; align-items: center; gap: 8px; }
+  .pp-icon {
+    width: 34px; height: 34px; border-radius: 10px; font-size: 17px;
+    display: flex; align-items: center; justify-content: center; background: var(--accent-soft);
+  }
+  .pp-title { flex: 1; }
+  .pp-title b { font-size: 15px; font-weight: 650; display: block; letter-spacing: -0.2px; }
+  .pp-title span { font-size: 11px; color: var(--secondary); }
+  .pp-stale { font-size: 10px; font-weight: 600; color: #B26A00; background: #FFF0DC; border-radius: 999px; padding: 2px 8px; }
+  .pp-track { height: 4px; border-radius: 2px; background: var(--fill); margin: 12px 0 6px; overflow: hidden; }
+  .pp-fill { height: 100%; width: 38%; border-radius: 2px; background: linear-gradient(90deg, #34C759, #30B350); }
+  .pp-stat { display: flex; justify-content: space-between; font-size: 11px; color: var(--secondary); }
+  .pp-item { display: flex; align-items: center; gap: 9px; padding: 7px 6px; border-radius: 10px; }
+  .pp-item.sel { background: #F0F6FF; }
+  .pp-state {
+    width: 20px; height: 20px; border-radius: 7px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; background: var(--fill);
+  }
+  .pp-state.s2 { background: #E8F8EE; color: #1B7F3B; }
+  .pp-state.s1 { background: #FFF0DC; color: #B26A00; }
+  .pp-name { flex: 1; font-size: 13px; }
+  .pp-name.strike { color: var(--secondary); text-decoration: line-through; }
+  .pp-last { font-size: 10.5px; color: #B26A00; }
+  .pp-note { font-size: 11px; color: var(--secondary); padding: 0 6px 2px 35px; }
+  .pp-divider { height: 0.5px; background: var(--separator); margin: 10px 0; }
+  .pp-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .pp-btn {
+    flex: 1; height: 30px; border-radius: 9px; font-size: 11.5px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--fill); color: var(--label);
+  }
+  .pp-btn.primary { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* ================= 色板 ================= */
+  .swatches { display: flex; gap: 12px; flex-wrap: wrap; }
+  .sw { width: 118px; }
+  .sw .chip { height: 52px; border-radius: 12px; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.08); }
+  .sw .nm { font-size: 11px; font-weight: 600; margin-top: 6px; }
+  .sw .cd { font-size: 10px; color: var(--secondary); font-family: "SF Mono", Consolas, monospace; }
+
+  .foot { text-align: center; color: var(--secondary); font-size: 11px; margin-top: 56px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Engineer Desk · UI 设计稿</h1>
+<p class="sub">iOS 质感重设计 · 基于 V2.0 全部功能 · 2026-10-24</p>
+
+<h2>0. 一句话定位</h2>
+<div class="card">
+  <p class="lead">把现在的"桌面黄色便签"升级成一张<b>安静、精致、随手可靠</b>的 iOS 风格工作面：功能一个不少，视觉噪音减一半。三个关键词——<b>留白、层级、材质</b>。</p>
+  <ul style="margin-top:10px">
+    <li><b>清晰（Clarity）</b>：内容永远是主角，工具条与状态条退到 8% 透明度的灰阶里。</li>
+    <li><b>克制（Deference）</b>：只保留一种强调色（暖橙），其余信息用灰阶分五档轻重。</li>
+    <li><b>深度（Depth）</b>：用"卡片浮在桌面上"的柔和投影 + 0.5px 发丝线表达层级，不用粗边框。</li>
+  </ul>
+</div>
+
+<h2>1. 设计令牌（Design Tokens）</h2>
+<div class="card">
+  <h3>1.1 色彩 · Light</h3>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#FFFDF8"></div><div class="nm">便签底 · Warm Paper</div><div class="cd">#FFFDF8</div></div>
+    <div class="sw"><div class="chip" style="background:#FF9F0A"></div><div class="nm">强调 · iOS Orange</div><div class="cd">#FF9F0A</div></div>
+    <div class="sw"><div class="chip" style="background:#1C1C1E"></div><div class="nm">正文 · Label</div><div class="cd">#1C1C1E</div></div>
+    <div class="sw"><div class="chip" style="background:#8E8E93"></div><div class="nm">次要 · Secondary</div><div class="cd">#8E8E93</div></div>
+    <div class="sw"><div class="chip" style="background:#34C759"></div><div class="nm">完成 · Green</div><div class="cd">#34C759</div></div>
+    <div class="sw"><div class="chip" style="background:#F4F3EE"></div><div class="nm">草稿区 · Draft</div><div class="cd">#F4F3EE</div></div>
+  </div>
+  <h3 style="margin-top:18px">1.2 规则</h3>
+  <table>
+    <tr><th>令牌</th><th>值</th><th>用在哪</th></tr>
+    <tr><td>圆角</td><td>窗口 18 / 卡片 12 / 按钮 8 / 胶囊 999</td><td>越大越"轻"，窗口级最大</td></tr>
+    <tr><td>发丝线</td><td>0.5px <code>rgba(60,60,67,0.12)</code></td><td>替代所有 1px 边框和分隔线</td></tr>
+    <tr><td>投影</td><td><code>0 1px 3px 4% + 0 12px 32px 10%</code></td><td>窗口级双层影；卡片只用第一层</td></tr>
+    <tr><td>字体栈</td><td><code>-apple-system / SF Pro / 苹方 / 雅黑</code></td><td>标题 -0.3px 字距，数字用等宽变体</td></tr>
+    <tr><td>字号阶梯</td><td>10 / 11 / 13 / 15 / 19</td><td>标注·胶囊 / 次要·备注 / 正文 / 标题·弹窗 / 区块标题</td></tr>
+    <tr><td>强调色使用</td><td>仅 3 处</td><td>分区按钮激活态、进行中状态、分割线</td></tr>
+  </table>
+  <p class="anno">对比现状：背景从纯黄 <code>#FFFDE7</code> 调成暖纸白 <code>#FFFDF8</code>（黄味保留但降饱和 60%）；红色分割线统一成品牌橙；灰色全部收敛到 iOS 灰阶，不再出现 #888/#999/#aaa 三种随机灰。</p>
+</div>
+
+<h2>2. 主窗口 · 单栏模式</h2>
+<div class="card" style="display:flex; gap:28px; justify-content:center; flex-wrap:wrap; background:transparent; box-shadow:none; padding:8px;">
+  <div class="phone-frame"><div class="note">
+    <div class="n-titlebar">
+      <span class="icon-btn">‹</span><span class="icon-btn">›</span>
+      <span class="n-title">国网 MPPT 移植</span>
+      <span class="date-chip">10-24 周六</span>
+      <span class="icon-btn">🔍</span><span class="icon-btn">📅</span>
+      <span class="icon-btn">📌</span><span class="icon-btn">⚙</span><span class="icon-btn">×</span>
+    </div>
+    <div class="n-formatbar">
+      <span class="f-btn" style="font-weight:700">B</span>
+      <span class="f-btn" style="font-style:italic">I</span>
+      <span class="f-btn" style="text-decoration:line-through">S</span>
+      <span class="f-btn" style="text-decoration:underline">U</span>
+      <span class="f-btn">🖍</span>
+      <span class="f-sep"></span>
+      <span class="f-btn">☑</span>
+      <span class="f-btn">⎺</span>
+      <span class="f-spacer"></span>
+      <span class="f-btn on">⬌ 分区</span>
+    </div>
+    <div class="n-body">
+      <div class="todo-row"><span class="chk done"></span><span class="done-text">mppt 扰动补偿 10 → 30</span></div>
+      <div class="todo-row"><span class="chk"></span><span>p 死区 0.05w → 1.8w</span></div>
+      <div style="height:6px"></div>
+      adc 标定 html 封装成通用工具
+      <div class="divider"><span>DIVIDER</span></div>
+      <span style="color:var(--secondary)">继续随手写…</span>
+    </div>
+    <div class="n-bottombar">
+      <span class="pill">Todo 0/2</span>
+      <span class="f-spacer"></span>
+      <div class="capsule-scroll">
+        <span class="pill green">🎯 RT-Thread 3/8</span>
+        <span class="pill warn">🚗 买车功课 · 12天没碰</span>
+        <span class="pill ghost">＋ 项目</span>
+      </div>
+    </div>
+  </div></div>
+  <div style="max-width:330px">
+    <h3>与现状的差异</h3>
+    <ul>
+      <li><b>标题栏</b>：日期从裸文本改为<b>日期胶囊</b>（等宽数字，带星期），一眼可扫；返回/前进箭头加大点击热区。</li>
+      <li><b>格式栏</b>：按钮从"方框线框"改为<b>无边框悬停显灰底</b>，激活态唯一使用橙色实底——整条工具栏视觉重量约等于零。</li>
+      <li><b>分割线</b>：从 24 个红字符改为<b>居中标签式分隔</b>（细线 + DIVIDER 微标），既美观又保持归档语义。</li>
+      <li><b>底部条</b>：Todo 统计收进一个胶囊；项目胶囊右对齐、完成度用<b>色相编码</b>（绿=全部完成，橙=停滞）。</li>
+    </ul>
+  </div>
+</div>
+
+<h2>3. 主窗口 · 左右分区（V2.0-b）</h2>
+<div class="card" style="display:flex; gap:28px; justify-content:center; flex-wrap:wrap; background:transparent; box-shadow:none; padding:8px;">
+  <div class="phone-frame"><div class="note">
+    <div class="n-titlebar">
+      <span class="icon-btn">‹</span><span class="icon-btn">›</span>
+      <span class="n-title">国网 MPPT 移植</span>
+      <span class="date-chip">10-24</span>
+      <span class="icon-btn active">⬌</span>
+      <span class="icon-btn">⚙</span><span class="icon-btn">×</span>
+    </div>
+    <div class="n-split">
+      <div class="pane">
+        <div class="pane-label"><span>记录</span><span>右键块 → 归档</span></div>
+        1. 扰动补偿 10 → 30<br>2. 死区 0.05w → 1.8w
+        <div class="divider"><span>DIVIDER</span></div>
+        adc 标定封装
+      </div>
+      <div class="pane draft">
+        <div class="pane-label"><span>草稿</span><span>可搜 · 不归档</span></div>
+        随手画箭头 →<br>涂涂改改<br>4800 × 0.15 = 720
+      </div>
+    </div>
+    <div class="n-bottombar">
+      <span class="pill">Todo 0/2</span>
+      <span class="f-spacer"></span>
+      <span class="pill green">🎯 RT-Thread 3/8</span>
+      <span class="pill ghost">＋ 项目</span>
+    </div>
+  </div></div>
+  <div style="max-width:330px">
+    <h3>分区设计</h3>
+    <ul>
+      <li>两栏都是<b>圆角浅色面板</b>（12px 圆角），左暖右冷 2 度色温差，暗示"正式 / 随手"。</li>
+      <li>分割开关激活时按钮橙色实底 + 图标变为 ⬌（高亮），单栏时完全隐形。</li>
+      <li>草稿区角落固定微标注「可搜 · 不归档」，防止误把草稿当正文归档。</li>
+      <li>中间拖拽手柄用 4px 留白 + 悬停出现 2px 橙色圆点提示，平时不可见。</li>
+    </ul>
+  </div>
+</div>
+
+<h2>4. 项目弹窗（V2.0-c）</h2>
+<div class="card" style="display:flex; gap:28px; justify-content:center; flex-wrap:wrap; background:transparent; box-shadow:none; padding:8px;">
+  <div class="proj-pop">
+    <div class="pp-head">
+      <div class="pp-icon">🎯</div>
+      <div class="pp-title"><b>学习 RT-Thread</b><span>创建于 09-12</span></div>
+      <span class="pp-stale">12 天没碰</span>
+    </div>
+    <div class="pp-track"><div class="pp-fill"></div></div>
+    <div class="pp-stat"><span>3/8 个子项完成</span><span>最近：10-12</span></div>
+    <div style="height:6px"></div>
+    <div class="pp-item"><span class="pp-state s2">✓</span><span class="pp-name strike">文件管理 fdt</span></div>
+    <div class="pp-item"><span class="pp-state s2">✓</span><span class="pp-name strike">mqtt 连接</span></div>
+    <div class="pp-item sel"><span class="pp-state s1">◐</span><span class="pp-name">mqtt QoS 2</span><span class="pp-last">回调里丢包</span><span class="anno">✎</span></div>
+    <div class="pp-note">└ （10-12）PUBREC 流程未通，怀疑 retain 标志位</div>
+    <div class="pp-item"><span class="pp-state">☐</span><span class="pp-name">网卡驱动移植</span><span class="anno">✎</span></div>
+    <div class="pp-divider"></div>
+    <div class="pp-note" style="padding-left:6px">📝 目标：年底前跑通网络协议栈；资料：官方文档 + 野火教程…</div>
+    <div class="pp-actions">
+      <div class="pp-btn primary">＋ 记一句进度</div>
+      <div class="pp-btn">＋ 子项</div>
+      <div class="pp-btn">⋯</div>
+    </div>
+  </div>
+  <div style="max-width:330px">
+    <h3>弹窗设计</h3>
+    <ul>
+      <li><b>头部卡片化</b>：图标放进 34px 圆角方块，「×天没碰」变成橙色小胶囊（≥7 天才出现），信息密度不变、焦虑感减半。</li>
+      <li><b>进度条</b>：4px 高、绿色渐变填充，配右上「最近日期」——比裸数字更有推进感。</li>
+      <li><b>三态图标</b>：从字符 ☐◐☑ 升级为 20px 圆角方块状态件（✓ 绿 / ◐ 橙 / 空灰），点击循环不变。</li>
+      <li><b>选中子项</b>：淡蓝底色块标记，「记一句进度」的目标一目了然。</li>
+      <li><b>底部操作</b>：主操作「记一句进度」橙色实底，其余灰底；项目删除收进「⋯」菜单，防误触。</li>
+      <li>Esc / 点外部关闭行为不变；弹窗出现动画 160ms 上浮 + 淡入（iOS sheet 手感）。</li>
+    </ul>
+  </div>
+</div>
+
+<h2>5. 主题</h2>
+<div class="card">
+  <p>应用固定使用本稿定义的浅色主题，不跟随操作系统切换深色外观；便签仍可使用设置中提供的自定义背景色。</p>
+</div>
+
+<h2>6. 动效与微交互</h2>
+<div class="card">
+  <table>
+    <tr><th>场景</th><th>动效</th><th>时长 / 曲线</th></tr>
+    <tr><td>弹窗出现 / 消失</td><td>从胶囊位置上浮 8px + 淡入淡出</td><td>160ms / <code>ease-out</code></td></tr>
+    <tr><td>左右分区切换</td><td>草稿面板宽度从 0 展开（非瞬间显隐）</td><td>220ms / <code>ease-in-out</code></td></tr>
+    <tr><td>子项三态切换</td><td>状态方块缩放弹跳 0.9 → 1.0</td><td>120ms</td></tr>
+    <tr><td>记一句进度</td><td>输入行滑入，回车后进度条增长动画</td><td>200ms</td></tr>
+    <tr><td>保存成功</td><td>「✓ 已保存」淡入，2s 后淡出（现状保留）</td><td>300ms</td></tr>
+  </table>
+  <p class="anno">原则：所有动效 ≤ 250ms、只作用于不透明度和位移，Qt 侧用 <code>QPropertyAnimation</code> 即可实现，无性能负担。</p>
+</div>
+
+<h2>7. 落地路线（每步独立可交付）</h2>
+<div class="card">
+  <table>
+    <tr><th>阶段</th><th>内容</th><th>验收</th></tr>
+    <tr><td><span class="tag">UI-a</span> 令牌化</td><td>把颜色/圆角/字号/间距收敛为 QSS token 表，替换现有散落的内联样式</td><td>界面无 #888 类随机灰，改一处全局生效</td></tr>
+    <tr><td><span class="tag">UI-b</span> 窗口层</td><td>暖纸白背景、18px 圆角、双层投影、发丝线替换所有边框</td><td>视觉对比现状：噪音明显减少</td></tr>
+    <tr><td><span class="tag">UI-c</span> 工具条</td><td>格式栏/标题栏/底栏按本稿重构，日期胶囊、分割线标签式</td><td>工具栏悬停/激活态符合规格</td></tr>
+    <tr><td><span class="tag">UI-d</span> 弹窗</td><td>项目弹窗按第 4 节重构 + 出现动画</td><td>160ms 上浮淡入；信息层级与本稿一致</td></tr>
+    <tr><td><span class="tag">UI-e</span> 主题</td><td>固定浅色令牌，菜单与确认框使用统一样式</td><td>不受系统深色模式影响</td></tr>
+  </table>
+  <p class="anno">建议顺序：先 UI-a（纯重构、零视觉变化）再逐层上皮肤，任何一步不满意可单独回退。</p>
+</div>
+
+<p class="foot">Engineer Desk UI 设计稿 · iOS 质感方向 · 2026-10-24 · 依据 iOS Human Interface Guidelines（Clarity / Deference / Depth）</p>
+</div>
+</body>
+</html>

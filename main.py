@@ -29,9 +29,8 @@ def main() -> None:
     app.setOrganizationName("EngineerDesk")
     app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出程序
 
-    # 全局设计令牌（iOS 质感主题，见 docs/EngineerDesk-ui-redesign.html）
-    theme.init(app)  # 先按系统深浅色定调色板（UI-e：跟随系统暗色）
-    app.setStyleSheet(theme.app_qss())
+    # 全局设计令牌（固定浅色主题，见 docs/EngineerDesk-ui-redesign.html）
+    theme.init(app)
 
     # 创建主窗口
     window = StickyNoteWindow()
@@ -42,6 +41,8 @@ def main() -> None:
         exit_callback=lambda: _quit_app(app, window),
         center_callback=lambda: window.center_on_primary_screen(),
     )
+    tray.auto_start_changed.connect(window.set_auto_start_state)
+    window.auto_start_changed.connect(tray.set_auto_start_state)
 
     # 连接关闭信号
     window.close_requested.connect(lambda: None)  # 隐藏到托盘

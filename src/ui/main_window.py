@@ -28,14 +28,17 @@ from src.widgets.tag_bar import TagBar
 from src.widgets.calendar_dialog import CalendarDialog
 from src.widgets.search_dialog import SearchDialog
 from src.widgets.project_capsule_bar import ProjectCapsuleBar
+from src.widgets.pill import PillLabel
 from src.ui.settings_dialog import SettingsDialog
 from src.ui import theme
+from src.services.startup_manager import StartupManager
 
 
 class StickyNoteWindow(QMainWindow):
     """桌面便签主窗口"""
 
     close_requested = Signal()  # 请求关闭（隐藏到托盘）
+    auto_start_changed = Signal(bool)
 
     # 边缘拖拽缩放的检测宽度（像素）
     _RESIZE_MARGIN: int = 6
@@ -142,16 +145,14 @@ class StickyNoteWindow(QMainWindow):
         self._h_split = QSplitter(Qt.Orientation.Horizontal)
         self._h_split.setHandleWidth(4)
         self._h_split.setChildrenCollapsible(False)
-        self._h_split.addWidget(editor_container)
-
         self._draft_editor = StickyEditor()
         self._draft_editor.setPlaceholderText("自由草稿区：随手画箭头、涂涂改改、临时算式…")
         self._draft_editor.content_changed.connect(self._auto_save.trigger)
 
         # 草稿面板（与记录面板同构）
-        draft_container = QWidget()
-        draft_container.setObjectName("draftPane")
-        draft_layout = QVBoxLayout(draft_container)
+        self._draft_container = QWidget()
+        self._draft_container.setObjectName("draftPane")
+        draft_layout = QVBoxLayout(self._draft_container)
         draft_layout.setContentsMargins(0, 0, 0, 0)
         draft_layout.setSpacing(2)
         self._draft_hint = QLabel("草稿 · 自动保存可搜索")
@@ -163,9 +164,9 @@ class StickyNoteWindow(QMainWindow):
         draft_layout.addWidget(self._draft_editor, 1)
 
         self._h_split.addWidget(editor_container)
-        self._h_split.addWidget(draft_container)
+        self._h_split.addWidget(self._draft_container)
         self._h_split.setSizes([60, 40])
-        self._draft_editor.setVisible(False)  # 默认单栏
+        self._draft_container.hide()  # 默认单栏
 
         splitter.addWidget(self._h_split)
 
@@ -237,8 +238,7 @@ class StickyNoteWindow(QMainWindow):
         layout.addWidget(self._title_edit, 1)
 
         # 日期胶囊（等宽数字 + 星期）
-        self._date_label = QLabel("")
-        self._date_label.setStyleSheet(theme.date_chip())
+        self._date_label = PillLabel()
         layout.addWidget(self._date_label)
 
         # 搜索按钮
@@ -311,7 +311,17 @@ class StickyNoteWindow(QMainWindow):
 
         highlight_btn = add_btn("🖍", "高亮（选色）", lambda: None)
         highlight_menu = QMenu(highlight_btn)
-        # 菜单样式走全局 QSS（随深浅色模式切换）
+        highlight_menu.setStyleSheet(
+            f"QMenu {{ background: {theme.SURFACE}; color: {theme.LABEL};"
+            f" border: 1px solid {theme.SEPARATOR}; border-radius: 10px;"
+            " padding: 5px; }"
+            f"QMenu::item {{ color: {theme.LABEL}; padding: 7px 14px;"
+            " border-radius: 7px; min-height: 20px; }}"
+            f"QMenu::item:selected {{ background: {theme.FILL};"
+            f" color: {theme.LABEL}; }}"
+            f"QMenu::separator {{ height: 1px; background: {theme.SEPARATOR};"
+            " margin: 4px 8px; }}"
+        )
         self._hl_cursor: QTextCursor | None = None  # 打开菜单时的选区快照
 
         def snapshot_selection() -> None:
@@ -360,7 +370,7 @@ class StickyNoteWindow(QMainWindow):
 
     def _set_split_mode(self, on: bool) -> None:
         """切换单栏 / 左右分割，并随当前便签按天保存"""
-        self._draft_editor.setVisible(on)
+        self._draft_container.setVisible(on)
         self._split_btn.setStyleSheet(theme.format_btn_on() if on else theme.format_btn())
 
         # 面板化：分区时左暖右冷两块圆角面板，单栏时透明
@@ -732,6 +742,9 @@ class StickyNoteWindow(QMainWindow):
             self._settings_dialog.font_size_changed.connect(self._set_font_size)
             self._settings_dialog.opacity_changed.connect(self._set_opacity)
             self._settings_dialog.bg_color_changed.connect(self._set_bg_color)
+            self._settings_dialog.auto_start_changed.connect(
+                self.auto_start_changed.emit
+            )
 
         # 打开前同步当前外观值
         self._settings_dialog.set_current_values(
@@ -740,9 +753,17 @@ class StickyNoteWindow(QMainWindow):
             bg_color=self._extract_bg_color(),
             opacity=self.windowOpacity(),
         )
+        auto_start_enabled = StartupManager.is_enabled()
+        self._settings_dialog.set_auto_start_state(auto_start_enabled)
+        self.auto_start_changed.emit(auto_start_enabled)
         self._settings_dialog.show()
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
+
+    def set_auto_start_state(self, enabled: bool) -> None:
+        """同步托盘菜单的开机启动状态到设置页"""
+        if self._settings_dialog is not None:
+            self._settings_dialog.set_auto_start_state(enabled)
 
     def _on_tag_clicked(self, tag: str) -> None:
         """标签被点击：在搜索对话框中搜索"""
@@ -1002,7 +1023,11 @@ class StickyNoteWindow(QMainWindow):
 
     def eventFilter(self, obj, event) -> bool:
         """捕获子控件上的边缘缩放鼠标事件"""
-        if isinstance(obj, QWidget) and (obj is self or self.isAncestorOf(obj)):
+        if (
+            event.type() in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove)
+            and isinstance(obj, QWidget)
+            and (obj is self or self.isAncestorOf(obj))
+        ):
             if event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.LeftButton:
                     edges = self._detect_resize_edge(self.mapFromGlobal(event.globalPosition().toPoint()))

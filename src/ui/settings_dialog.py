@@ -1,19 +1,20 @@
 ﻿"""
-设置页面对话框
+设置页面对话框（对齐细化设计稿 §8）
+卡片质感：无边框卡片、圆角输入/滑块/色块，选中色块橙描边
 管理应用配置和应用外观：字体、字号、透明度、背景色、开机启动
 """
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+    QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QCheckBox, QGroupBox, QFormLayout, QSlider,
-    QComboBox, QLineEdit, QGridLayout, QFrame,
+    QComboBox, QGridLayout, QFrame,
 )
-from PySide6.QtGui import QFont, QColor
 
 from src.services.config_manager import ConfigManager
 from src.services.startup_manager import StartupManager
 from src.ui import theme
+from src.ui.card_dialog import CardDialog
 
 # 预设背景色 — 参考主流笔记/文本类产品的柔和色调
 PRESET_COLORS = [
@@ -32,7 +33,7 @@ PRESET_COLORS = [
 ]
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(CardDialog):
     """设置对话框"""
 
     # 外观变更信号
@@ -40,36 +41,16 @@ class SettingsDialog(QDialog):
     font_size_changed = Signal(int)
     opacity_changed = Signal(float)
     bg_color_changed = Signal(str)
+    auto_start_changed = Signal(bool)
 
     def __init__(self, parent=None) -> None:
-        super().__init__(parent)
+        super().__init__(parent, title="设置", size=(452, 520))
         self._config: ConfigManager = ConfigManager()
         self._current_bg: str = "#FDFBF7"
-        self.setWindowTitle("设置")
-        self.setWindowFlags(
-            Qt.WindowType.Dialog
-            | Qt.WindowType.WindowStaysOnTopHint
-        )
-        self.setMinimumSize(420, 480)
-        self.setStyleSheet(theme.dialog_qss())
+        self._init_body()
 
-        self._init_ui()
-
-    def _init_ui(self) -> None:
-        """初始化界面"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
-
-        # 标题
-        title = QLabel("设置")
-        title.setStyleSheet(
-            f"font-size: 17px; font-weight: 650; letter-spacing: -0.3px;"
-            f" color: {theme.LABEL}; background: transparent;"
-        )
-        layout.addWidget(title)
-
-        # ===== 外观设置 =====
+    def _init_body(self) -> None:
+        # ===== 外观 =====
         appearance_group = QGroupBox("外观")
         appearance_layout = QFormLayout(appearance_group)
         appearance_layout.setSpacing(8)
@@ -102,82 +83,79 @@ class SettingsDialog(QDialog):
 
         # 透明度
         opacity_layout = QHBoxLayout()
+        opacity_layout.setSpacing(8)
         self._opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._opacity_slider.setRange(50, 100)
         self._opacity_slider.setValue(95)
-        self._opacity_slider.setTickInterval(10)
-        self._opacity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self._opacity_slider.valueChanged.connect(self._on_opacity_changed)
-        opacity_layout.addWidget(self._opacity_slider)
+        opacity_layout.addWidget(self._opacity_slider, 1)
 
         self._opacity_label = QLabel("95%")
         self._opacity_label.setFixedWidth(36)
+        self._opacity_label.setStyleSheet(
+            f"color: {theme.SECONDARY}; font-size: 11px;"
+            " font-variant-numeric: tabular-nums;"
+        )
         opacity_layout.addWidget(self._opacity_label)
         appearance_layout.addRow("透明度:", opacity_layout)
 
-        layout.addWidget(appearance_group)
+        self.body.addWidget(appearance_group)
 
-        # ===== 常规设置 =====
+        # ===== 常规 =====
         general_group = QGroupBox("常规")
         general_layout = QVBoxLayout(general_group)
 
         self._auto_start_checkbox = QCheckBox("开机自动启动")
-        self._auto_start_checkbox.setChecked(StartupManager.is_enabled())
+        auto_start_enabled = StartupManager.is_enabled()
+        self._config.auto_start = auto_start_enabled
+        self._auto_start_checkbox.setChecked(auto_start_enabled)
         self._auto_start_checkbox.toggled.connect(self._toggle_auto_start)
         general_layout.addWidget(self._auto_start_checkbox)
 
-        layout.addWidget(general_group)
+        self.body.addWidget(general_group)
 
         # ===== 关于 =====
         about_group = QGroupBox("关于")
         about_layout = QFormLayout(about_group)
         about_layout.addRow("应用名称:", QLabel("Engineer Desk"))
-        about_layout.addRow("版本:", QLabel("V1.1"))
+        about_layout.addRow("版本:", QLabel("V2.0"))
         about_layout.addRow("技术栈:", QLabel("Python 3.13 + PySide6 + SQLite"))
         about_layout.addRow("平台:", QLabel("Windows"))
-        layout.addWidget(about_group)
+        self.body.addWidget(about_group)
 
-        layout.addStretch()
-
-        # 底部按钮
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        close_btn = QPushButton("关闭")
-        close_btn.setMinimumWidth(80)
-        close_btn.setProperty("qss", "secondary")
-        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
-        layout.addLayout(btn_layout)
+        self.body.addStretch()
 
     def _create_color_grid(self) -> QFrame:
-        """创建预设颜色色块网格"""
+        """预设颜色色块网格：checkable + autoExclusive，选中橙描边"""
         container = QFrame()
         container.setStyleSheet("QFrame { background: transparent; border: none; }")
         grid = QGridLayout(container)
-        grid.setSpacing(4)
-        grid.setContentsMargins(4, 4, 4, 4)
+        grid.setSpacing(6)
+        grid.setContentsMargins(0, 0, 0, 0)
 
         for i, (name, hex_color) in enumerate(PRESET_COLORS):
-            row = i // 4
-            col = i % 4
+            row = i // 6
+            col = i % 6
 
             swatch = QPushButton()
-            swatch.setFixedSize(44, 28)
+            swatch.setFixedSize(34, 24)
+            swatch.setCheckable(True)
+            swatch.setAutoExclusive(True)
             swatch.setCursor(Qt.CursorShape.PointingHandCursor)
             swatch.setToolTip(name)
-            # 暗色背景用白色边框区分
-            border_color = "#555" if hex_color == "#2D2D2D" else theme.SEPARATOR
+            # 暗色背景用白色描边区分
+            border_color = "#5A5A5E" if hex_color == "#2D2D2D" else theme.SEPARATOR
             swatch.setStyleSheet(
                 f"QPushButton {{"
                 f" background-color: {hex_color};"
                 f" border: 1px solid {border_color};"
-                f" border-radius: 8px;"
-                f"}}"
-                f"QPushButton:hover {{ border: 2px solid {theme.ACCENT}; }}"
+                f" border-radius: 7px;"
+                f" }}"
+                f"QPushButton:hover {{ border: 1.5px solid {theme.SECONDARY}; }}"
+                f"QPushButton:checked {{ border: 2px solid {theme.ACCENT}; }}"
             )
-            swatch.clicked.connect(
-                lambda checked, c=hex_color: self._select_color(c)
+            swatch.toggled.connect(
+                lambda checked, c=hex_color: self._select_color(checked, c)
             )
             grid.addWidget(swatch, row, col)
 
@@ -212,8 +190,10 @@ class SettingsDialog(QDialog):
         self._opacity_slider.blockSignals(False)
         self._opacity_label.setText(f"{pct}%")
 
-    def _select_color(self, hex_color: str) -> None:
-        """选择预设背景色"""
+    def _select_color(self, checked: bool, hex_color: str) -> None:
+        """选择预设背景色（toggled：仅选中时发信号）"""
+        if not checked:
+            return
         self._current_bg = hex_color
         self.bg_color_changed.emit(hex_color)
 
@@ -229,3 +209,10 @@ class SettingsDialog(QDialog):
         else:
             StartupManager.disable()
         self._config.auto_start = enabled
+        self.auto_start_changed.emit(enabled)
+
+    def set_auto_start_state(self, enabled: bool) -> None:
+        """从托盘菜单同步开机启动状态，不重复写注册表"""
+        self._auto_start_checkbox.blockSignals(True)
+        self._auto_start_checkbox.setChecked(enabled)
+        self._auto_start_checkbox.blockSignals(False)

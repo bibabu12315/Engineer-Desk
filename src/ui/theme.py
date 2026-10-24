@@ -1,99 +1,78 @@
 """
-UI 设计令牌（Design Tokens）— iOS 质感主题（Light / Dark 双模式）
+UI 设计令牌（Design Tokens）— 固定浅色主题
 依据 docs/EngineerDesk-ui-redesign.html：
 - 强调色只保留一种（iOS Orange），其余灰阶收敛为 Label/Secondary/Tertiary 三档
 - 0.5px 发丝线替代边框；窗口 18 / 面板 12 / 按钮 8 / 胶囊 999 圆角
 - 所有 QSS 都从这里取值，禁止散落硬编码色值
 
-模式：main.py 启动时调用 init(app)，跟随系统深浅色；
-colorSchemeChanged 时自动重应用（chrome 即时刷新，便签底色在下次加载便签时生效）。
+main.py 启动时调用 init(app)，始终使用设计稿中的浅色主题。
 """
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette
+from PySide6.QtGui import QColor, QPalette
 
-MODE = "light"  # "light" | "dark"
-
-# 便签底色：浅色默认暖纸白，深色默认暗纸黑（用户自定义色不覆盖）
+# 便签底色：固定暖纸白（用户自定义色不覆盖）
 PAPER_LIGHT = "#FFFDF8"
-PAPER_DARK = "#1F1F21"
-# 会被"跟随主题"的底色集合（旧默认 + 新默认）
-# 会被"跟随主题"的底色集合（历代默认色；用户自定义色不在其中，原样保留）
-THEME_DEFAULT_BGS = {PAPER_LIGHT, PAPER_DARK, "#FFFDE7", "#FDFBF7"}
+THEME_DEFAULT_BGS = {PAPER_LIGHT, "#1F1F21", "#FFFDE7", "#FDFBF7"}
 
-# ==================== 双调色板 ====================
-
-_LIGHT = dict(
-    BG=PAPER_LIGHT, LABEL="#1C1C1E", SECONDARY="#8E8E93", TERTIARY="#C7C7CC",
-    SEPARATOR="rgba(60,60,67,0.12)",
-    FILL="rgba(120,120,128,0.08)", FILL2="rgba(120,120,128,0.16)",
-    ACCENT="#FF9F0A", ACCENT_SOFT="#FFF4E0", ACCENT_HOVER="#E88F00",
-    GREEN="#34C759", GREEN_SOFT="#E8F8EE", GREEN_DEEP="#1B7F3B",
-    WARN_SOFT="#FFF0DC", WARN_DEEP="#B26A00",
-    BLUE="#007AFF", BLUE_SOFT="#F0F6FF", RED="#FF3B30",
-    INPUT_BG="#FFFFFF", SURFACE="#FFFFFF",
-    PANE_BG="#FBF9F2", DRAFT_BG="#F4F3EE",       # 分区：左记录 / 右草稿
-)
-
-_DARK = dict(
-    BG=PAPER_DARK, LABEL="#F2F2F7", SECONDARY="#98989E", TERTIARY="#5A5A5E",
-    SEPARATOR="rgba(84,84,88,0.6)",
-    FILL="rgba(120,120,128,0.24)", FILL2="rgba(120,120,128,0.32)",
-    ACCENT="#FF9F0A", ACCENT_SOFT="rgba(255,159,10,0.18)", ACCENT_HOVER="#FFB340",
-    GREEN="#30D158", GREEN_SOFT="rgba(48,209,88,0.18)", GREEN_DEEP="#30D158",
-    WARN_SOFT="rgba(255,159,10,0.18)", WARN_DEEP="#FF9F0A",
-    BLUE="#0A84FF", BLUE_SOFT="rgba(10,132,255,0.18)", RED="#FF453A",
-    INPUT_BG="#2C2C2E", SURFACE="#2C2C2E",
-    PANE_BG="#2A2A2C", DRAFT_BG="#232325",
-)
-
-
-def _apply(mode: str) -> None:
-    """把对应调色板写入模块全局（所有 theme.X 取值都是运行时查全局）"""
-    global MODE
-    MODE = mode
-    palette = _DARK if mode == "dark" else _LIGHT
-    for k, v in palette.items():
-        globals()[k] = v
-
-
-_apply("light")
+BG = PAPER_LIGHT
+LABEL = "#1C1C1E"
+SECONDARY = "#8E8E93"
+TERTIARY = "#C7C7CC"
+SEPARATOR = "rgba(60,60,67,0.12)"
+FILL = "rgba(120,120,128,0.08)"
+FILL2 = "rgba(120,120,128,0.16)"
+ACCENT = "#FF9F0A"
+ACCENT_SOFT = "#FFF4E0"
+ACCENT_HOVER = "#E88F00"
+GREEN = "#34C759"
+GREEN_SOFT = "#E8F8EE"
+GREEN_DEEP = "#1B7F3B"
+WARN_SOFT = "#FFF0DC"
+WARN_DEEP = "#B26A00"
+BLUE = "#007AFF"
+BLUE_SOFT = "#F0F6FF"
+RED = "#FF3B30"
+INPUT_BG = "#FFFFFF"
+SURFACE = "#FFFFFF"
+PANE_BG = "#FBF9F2"
+DRAFT_BG = "#F4F3EE"
 
 FONT_STACK = '"Microsoft YaHei", "PingFang SC", sans-serif'
 
 
-def is_dark() -> bool:
-    return MODE == "dark"
-
-
 def init(app) -> None:
-    """启动时按系统深浅色应用调色板，并监听切换"""
-    hints = app.styleHints()
-    scheme = None
-    try:
-        scheme = hints.colorScheme()
-    except Exception:
-        pass
-    _apply("dark" if scheme == Qt.ColorScheme.Dark else "light")
-
-    try:
-        hints.colorSchemeChanged.connect(
-            lambda scheme: (_apply(
-                "dark" if scheme == Qt.ColorScheme.Dark else "light"
-            ), app.setStyleSheet(app_qss()))
-        )
-    except Exception:
-        pass  # 旧版 Qt 无 colorSchemeChanged，启动时定死
+    """固定应用到设计稿定义的浅色调色板和控件样式"""
+    app.setStyle("Fusion")
+    palette = QPalette()
+    colors = {
+        QPalette.ColorRole.Window: BG,
+        QPalette.ColorRole.WindowText: LABEL,
+        QPalette.ColorRole.Base: SURFACE,
+        QPalette.ColorRole.AlternateBase: FILL,
+        QPalette.ColorRole.ToolTipBase: LABEL,
+        QPalette.ColorRole.ToolTipText: BG,
+        QPalette.ColorRole.Text: LABEL,
+        QPalette.ColorRole.Button: FILL,
+        QPalette.ColorRole.ButtonText: LABEL,
+        QPalette.ColorRole.BrightText: RED,
+        QPalette.ColorRole.Highlight: BLUE,
+        QPalette.ColorRole.HighlightedText: "#FFFFFF",
+        QPalette.ColorRole.Link: BLUE,
+    }
+    for role, color in colors.items():
+        palette.setColor(role, QColor(color))
+    app.setPalette(palette)
+    app.setStyleSheet(app_qss())
 
 
 def note_paper(user_bg: str) -> str:
     """决定便签内容区底色：
     - 用户自定义过颜色（不在默认色集合里）→ 原样保留
-    - 默认色 / 旧默认色 → 跟随主题（暗色用暗纸黑）
+    - 默认色 / 旧默认色 → 使用设计稿的浅色纸面
     """
     if user_bg and user_bg not in THEME_DEFAULT_BGS:
         return user_bg
-    return PAPER_DARK if is_dark() else PAPER_LIGHT
+    return PAPER_LIGHT
 
 
 # ==================== 全局 QSS ====================
@@ -103,7 +82,10 @@ def app_qss() -> str:
     return f"""
     QWidget {{ font-family: {FONT_STACK}; color: {LABEL}; }}
     QTextEdit {{ color: {LABEL}; }}
-    QLineEdit {{ color: {LABEL}; selection-background-color: {FILL2}; }}
+    QLineEdit {{
+        color: {LABEL}; selection-background-color: {BLUE};
+        selection-color: #FFFFFF;
+    }}
     QToolTip {{
         background: {LABEL}; color: {BG}; border: none;
         border-radius: 6px; padding: 4px 8px; font-size: 11px;
@@ -115,6 +97,13 @@ def app_qss() -> str:
     QMenu::item {{ padding: 5px 20px 5px 10px; border-radius: 7px; font-size: 12px; }}
     QMenu::item:selected {{ background: {FILL}; }}
     QMenu::separator {{ height: 0.5px; background: {SEPARATOR}; margin: 4px 8px; }}
+    QMessageBox {{ background: {SURFACE}; color: {LABEL}; }}
+    QMessageBox QLabel {{ color: {LABEL}; background: transparent; }}
+    QMessageBox QPushButton {{
+        color: {LABEL}; background: {FILL}; border: none;
+        border-radius: 7px; padding: 5px 14px; min-width: 56px;
+    }}
+    QMessageBox QPushButton:hover {{ background: {FILL2}; }}
 
     /* 细滚动条：平时隐形，悬停显形 */
     QScrollBar:vertical {{ background: transparent; width: 6px; margin: 2px; }}
@@ -184,17 +173,21 @@ def date_chip() -> str:
         " font-variant-numeric: tabular-nums; }"
     )
 
-def pill(variant: str = "base") -> str:
-    """胶囊样式：base / green / warn / ghost / blue"""
-    m = {
-        "base":  (FILL, LABEL, "none"),
+def pill_palette(variant: str = "base") -> tuple[str, str, str]:
+    """返回胶囊的背景、文字和边框颜色"""
+    variants = {
+        "base": (FILL, LABEL, "none"),
         "green": (GREEN_SOFT, GREEN_DEEP, "none"),
-        "warn":  (WARN_SOFT, WARN_DEEP, "none"),
-        "blue":  (BLUE_SOFT, BLUE, "none"),
+        "warn": (WARN_SOFT, WARN_DEEP, "none"),
+        "blue": (BLUE_SOFT, BLUE, "none"),
         "ghost": ("transparent", SECONDARY, f"0.5px dashed {TERTIARY}"),
         "primary": (ACCENT, BG, "none"),
     }
-    bg, fg, border = m.get(variant, m["base"])
+    return variants.get(variant, variants["base"])
+
+def pill(variant: str = "base") -> str:
+    """胶囊样式：base / green / warn / ghost / blue"""
+    bg, fg, border = pill_palette(variant)
     weight = "600;" if variant == "primary" else "500;"
     return (
         "QPushButton {"
@@ -208,7 +201,6 @@ def pill(variant: str = "base") -> str:
 def dialog_qss() -> str:
     """对话框通用皮肤：卡片化 GroupBox / 圆角输入 / 主题按钮 / 滑块"""
     return f"""
-    QDialog {{ background: {BG}; }}
     QLabel {{ background: transparent; }}
     QGroupBox {{
         background: {SURFACE}; border: 0.5px solid {SEPARATOR};
@@ -247,6 +239,12 @@ def dialog_qss() -> str:
         border: 1.5px solid {TERTIARY}; background: transparent;
     }}
     QCheckBox::indicator:hover {{ border-color: {SECONDARY}; }}
+    QCheckBox::indicator:checked {{
+        background: {ACCENT}; border: 1.5px solid {ACCENT};
+    }}
+    QCheckBox::indicator:checked:hover {{
+        background: {ACCENT_HOVER}; border-color: {ACCENT_HOVER};
+    }}
     QSlider::groove:horizontal {{
         height: 4px; border-radius: 2px; background: {FILL2};
     }}
@@ -280,8 +278,8 @@ def calendar_qss() -> str:
         border: 0.5px solid {SEPARATOR}; border-radius: 6px; }}
     QCalendarWidget QAbstractItemView:enabled {{
         color: {LABEL}; background: {SURFACE};
-        selection-background-color: {ACCENT_SOFT};
-        selection-color: {WARN_DEEP}; outline: none;
+        selection-background-color: {ACCENT};
+        selection-color: #FFFFFF; outline: none;
     }}
     QCalendarWidget QAbstractItemView:disabled {{ color: {TERTIARY}; }}
     QCalendarWidget QWidget#qt_calendar_calendarview {{

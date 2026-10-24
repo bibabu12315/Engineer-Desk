@@ -5,7 +5,7 @@
 
 from typing import Callable
 
-from PySide6.QtCore import QObject
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
 from PySide6.QtGui import QIcon, QAction
 
@@ -15,6 +15,8 @@ from src.services.startup_manager import StartupManager
 
 class SystemTray(QObject):
     """系统托盘管理"""
+
+    auto_start_changed = Signal(bool)
 
     def __init__(
         self,
@@ -63,7 +65,9 @@ class SystemTray(QObject):
         # 开机启动
         self._auto_start_action = menu.addAction("开机启动")
         self._auto_start_action.setCheckable(True)
-        self._auto_start_action.setChecked(self._config.auto_start)
+        enabled = StartupManager.is_enabled()
+        self._config.auto_start = enabled
+        self._auto_start_action.setChecked(enabled)
         self._auto_start_action.triggered.connect(self._toggle_auto_start)
 
         menu.addSeparator()
@@ -89,12 +93,16 @@ class SystemTray(QObject):
         else:
             StartupManager.disable()
         self._config.auto_start = enabled
+        self.auto_start_changed.emit(enabled)
+
+    def set_auto_start_state(self, enabled: bool) -> None:
+        """从设置页同步状态，不重复写注册表"""
+        self._auto_start_action.setChecked(enabled)
+        self._config.auto_start = enabled
 
     def update_auto_start_state(self) -> None:
         """更新开机启动菜单状态"""
-        enabled = StartupManager.is_enabled()
-        self._auto_start_action.setChecked(enabled)
-        self._config.auto_start = enabled
+        self.set_auto_start_state(StartupManager.is_enabled())
 
     def show_message(self, title: str, message: str) -> None:
         """显示托盘消息"""
