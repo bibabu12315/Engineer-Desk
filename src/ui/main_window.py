@@ -11,7 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from PySide6.QtCore import Qt, Signal, QPoint, QEvent, QRect
+from PySide6.QtCore import Qt, Signal, QPoint, QEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLineEdit, QPushButton, QLabel, QFrame, QColorDialog,
@@ -52,12 +52,8 @@ class StickyNoteWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setWindowTitle("Engineer Desk")
 
-        # 拖拽支持
+        # 拖拽/缩放支持（拖拽与缩放交由系统原生处理，保证跨 DPI 屏平滑）
         self._drag_pos: QPoint | None = None
-        self._resizing: bool = False
-        self._resize_edges: Qt.Edge = Qt.Edge(0)
-        self._resize_origin: QPoint | None = None
-        self._resize_geometry: QRect | None = None
 
         # 置顶状态
         self._is_pinned: bool = self._config.get("always_on_top", "1") == "1"
@@ -86,6 +82,12 @@ class StickyNoteWindow(QMainWindow):
                 app.screenRemoved.connect(self._on_screen_removed)
             except Exception:
                 pass
+
+        # 跨屏保持物理尺寸：窗口所属屏幕变化时按 DPR 比值重设尺寸
+        # windowHandle() 在首次 show 之前可能为 None，因此延迟到 showEvent 连接
+        self.setMinimumSize(260, 260)  # 原生缩放由系统限制最小尺寸
+        self._prev_dpr: float | None = None
+        self._dpi_hooked: bool = False
 
     def _init_ui(self) -> None:
         """初始化界面"""
@@ -697,7 +699,19 @@ class StickyNoteWindow(QMainWindow):
         match = re.search(r"background-color:\s*([^;]+)", style)
         return match.group(1).strip() if match else "#FFFDE7"
 
-    # ==================== 窗口缩放辅助 ====================
+    def hide_to_tray(self) -> None:
+        """隐藏到系统托盘"""
+        self._save_all()
+        self.hide()
+        self.close_requested.emit()
+
+    def show_window(self) -> None:
+        """显示窗口"""
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    # ==================== 窗口拖拽与缩放事件 ====================
 
     def _detect_resize_edge(self, pos: QPoint) -> Qt.Edge:
         """检测鼠标位置对应的窗口缩放边缘"""
@@ -728,100 +742,41 @@ class StickyNoteWindow(QMainWindow):
             return Qt.CursorShape.SizeVerCursor
         return Qt.CursorShape.ArrowCursor
 
-    def _begin_resize(self, global_pos: QPoint, edges: Qt.Edge) -> None:
-        """开始边缘缩放"""
-        self._resizing = True
-        self._resize_edges = edges
-        self._resize_origin = global_pos
-        self._resize_geometry = self.geometry()
-
-    def _update_resize(self, global_pos: QPoint) -> None:
-        """更新边缘缩放"""
-        if not self._resizing or self._resize_origin is None or self._resize_geometry is None:
-            return
-
-        delta = global_pos - self._resize_origin
-        start = self._resize_geometry
-        left = start.x()
-        top = start.y()
-        right = start.x() + start.width()
-        bottom = start.y() + start.height()
-
-        if self._resize_edges & Qt.Edge.LeftEdge:
-            left += delta.x()
-        if self._resize_edges & Qt.Edge.RightEdge:
-            right += delta.x()
-        if self._resize_edges & Qt.Edge.TopEdge:
-            top += delta.y()
-        if self._resize_edges & Qt.Edge.BottomEdge:
-            bottom += delta.y()
-
-        min_width = max(self.minimumWidth(), 260)
-        min_height = max(self.minimumHeight(), 260)
-
-        if right - left < min_width:
-            if self._resize_edges & Qt.Edge.LeftEdge:
-                left = right - min_width
-            else:
-                right = left + min_width
-
-        if bottom - top < min_height:
-            if self._resize_edges & Qt.Edge.TopEdge:
-                top = bottom - min_height
-            else:
-                bottom = top + min_height
-
-        self.setGeometry(left, top, right - left, bottom - top)
-
-    def _finish_resize(self) -> None:
-        """结束边缘缩放"""
-        self._resizing = False
-        self._resize_edges = Qt.Edge(0)
-        self._resize_origin = None
-        self._resize_geometry = None
-        self._auto_save.trigger()
-
-    def hide_to_tray(self) -> None:
-        """隐藏到系统托盘"""
-        self._save_all()
-        self.hide()
-        self.close_requested.emit()
-
-    def show_window(self) -> None:
-        """显示窗口"""
-        self.show()
-        self.raise_()
-        self.activateWindow()
-
-    # ==================== 窗口拖拽与缩放事件 ====================
+    def _start_native_resize(self, edges: Qt.Edge) -> bool:
+        """交给系统原生执行边缘缩放（跨 DPI 屏由 OS 处理，避免跳动）"""
+        handle = self.windowHandle()
+        if handle is None or edges == Qt.Edge(0):
+            return False
+        return handle.startSystemResize(edges)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             edges = self._detect_resize_edge(self.mapFromGlobal(event.globalPosition().toPoint()))
-            if edges != Qt.Edge(0):
-                self._begin_resize(event.globalPosition().toPoint(), edges)
+            if edges != Qt.Edge(0) and self._start_native_resize(edges):
+                event.accept()
                 return
             self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if self._resizing:
-            self._update_resize(event.globalPosition().toPoint())
-            return
-
         edges = self._detect_resize_edge(self.mapFromGlobal(event.globalPosition().toPoint()))
         self.setCursor(self._cursor_for_edges(edges))
 
-        if event.buttons() & Qt.MouseButton.LeftButton and self._drag_pos is not None:
+        if (
+            event.buttons() & Qt.MouseButton.LeftButton
+            and self._drag_pos is not None
+        ):
+            handle = self.windowHandle()
+            if handle is not None and handle.startSystemMove():
+                self._drag_pos = None  # 已交给系统接管，停止手动跟随
+                event.accept()
+                return
             self.move(event.globalPosition().toPoint() - self._drag_pos)
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self._drag_pos = None
-        if self._resizing:
-            self._finish_resize()
-        else:
-            self._auto_save.trigger()
+        self._auto_save.trigger()
         self.setCursor(Qt.CursorShape.ArrowCursor)
         super().mouseReleaseEvent(event)
 
@@ -831,22 +786,59 @@ class StickyNoteWindow(QMainWindow):
             if event.type() == QEvent.Type.MouseButtonPress:
                 if event.button() == Qt.MouseButton.LeftButton:
                     edges = self._detect_resize_edge(self.mapFromGlobal(event.globalPosition().toPoint()))
-                    if edges != Qt.Edge(0):
-                        self._begin_resize(event.globalPosition().toPoint(), edges)
+                    if edges != Qt.Edge(0) and self._start_native_resize(edges):
                         return True
             elif event.type() == QEvent.Type.MouseMove:
-                if self._resizing:
-                    self._update_resize(event.globalPosition().toPoint())
-                    return True
                 edges = self._detect_resize_edge(self.mapFromGlobal(event.globalPosition().toPoint()))
                 self.setCursor(self._cursor_for_edges(edges))
-            elif event.type() == QEvent.Type.MouseButtonRelease:
-                if self._resizing:
-                    self._finish_resize()
-                    self.setCursor(Qt.CursorShape.ArrowCursor)
-                    return True
 
         return super().eventFilter(obj, event)
+
+    # ==================== 跨屏物理尺寸保持 ====================
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        # 首次显示后 windowHandle 才可用，在此挂接 screenChanged
+        if not self._dpi_hooked:
+            handle = self.windowHandle()
+            if handle is not None:
+                handle.screenChanged.connect(self._on_screen_changed)
+                self._prev_dpr = handle.screen().devicePixelRatio()
+                self._dpi_hooked = True
+
+    def _on_screen_changed(self, screen) -> None:
+        """窗口跨屏时保持物理尺寸不变
+
+        Qt 默认行为是保持逻辑尺寸 → 物理尺寸随两屏缩放倍数比值突变。
+        这里反向补偿：new_logical = old_logical * (old_dpr / new_dpr)，
+        使物理像素尺寸跨屏恒定，并以窗口中心为锚点、限制在目标屏可视区内。
+        """
+        handle = self.windowHandle()
+        if handle is None or screen is None:
+            return
+
+        new_dpr = screen.devicePixelRatio()
+        if self._prev_dpr is None or abs(new_dpr - self._prev_dpr) < 1e-6:
+            self._prev_dpr = new_dpr
+            return
+
+        old_dpr = self._prev_dpr
+        self._prev_dpr = new_dpr
+
+        geo = self.geometry()
+        ratio = old_dpr / new_dpr
+        new_w = max(self.minimumWidth(), round(geo.width() * ratio))
+        new_h = max(self.minimumHeight(), round(geo.height() * ratio))
+
+        # 以中心为锚点换算位置，并夹在目标屏可用区域内
+        center = geo.center()
+        area = screen.availableGeometry()
+        x = center.x() - new_w // 2
+        y = center.y() - new_h // 2
+        x = max(area.left(), min(x, area.right() - new_w + 1))
+        y = max(area.top(), min(y, area.bottom() - new_h + 1))
+
+        self.setGeometry(x, y, new_w, new_h)
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
