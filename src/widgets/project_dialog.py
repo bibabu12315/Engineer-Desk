@@ -44,7 +44,13 @@ class ProjectDialog(QWidget):
         self._project_id = project_id
         self._selected_item_id: int | None = None  # 「记一句进度」目标子项
 
-        self.setWindowFlags(Qt.WindowType.Popup)
+        # 不能用 Qt.Popup：Windows 上 Popup 窗口会禁用中文输入法（IME 无法上屏）。
+        # 改用 Tool 无边框置顶窗（IME 正常），外部点击关闭由 _app_event_filter 模拟。
+        self.setWindowFlags(
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.WindowStaysOnTopHint
+        )
         self.setObjectName("projectDialog")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
@@ -56,6 +62,49 @@ class ProjectDialog(QWidget):
 
         self._init_ui()
         self.refresh()
+
+        # 模拟 Popup 的"点击外部关闭"：监听全局鼠标按下
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+
+    def closeEvent(self, event) -> None:
+        from PySide6.QtWidgets import QApplication
+        app = QApplication.instance()
+        if app is not None:
+            app.removeEventFilter(self)
+        super().closeEvent(event)
+
+    def keyPressEvent(self, event) -> None:
+        # Tool 窗口默认不响应 Esc，手动补上
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    # 统一入口：行内备注 Esc 取消 + 模拟 Popup 的"点击弹窗与胶囊以外区域关闭"
+    def eventFilter(self, obj, event) -> bool:
+        from PySide6.QtCore import QEvent
+        if obj is getattr(self, "_inline_note_edit", None):
+            if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+                self._inline_note_edit.deleteLater()
+                self._inline_note_edit = None
+                return True
+        if event.type() == QEvent.Type.MouseButtonPress and obj is not self:
+            gp = event.globalPosition().toPoint()
+            outside = not self.geometry().contains(gp)
+            parent = self.parent()
+            if parent is not None:
+                # 父部件（胶囊条）区域用全局坐标换算，点胶囊本身走 toggle 逻辑
+                from PySide6.QtCore import QRect
+                top_left = parent.mapToGlobal(parent.rect().topLeft())
+                parent_rect = QRect(top_left, parent.size())
+                outside = outside and not parent_rect.contains(gp)
+            if outside:
+                self.close()
+        return super().eventFilter(obj, event)
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = QPainter(self)
@@ -381,16 +430,6 @@ class ProjectDialog(QWidget):
             index = self._items_layout.indexOf(container) + 1
         self._items_layout.insertWidget(max(index, 0), edit)
         edit.setFocus()
-
-    def eventFilter(self, obj, event) -> bool:
-        # 行内备注输入框 Esc 取消
-        if obj is getattr(self, "_inline_note_edit", None):
-            from PySide6.QtCore import QEvent
-            if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
-                self._inline_note_edit.deleteLater()
-                self._inline_note_edit = None
-                return True
-        return super().eventFilter(obj, event)
 
     def _save_item_note(self, item_id: int, text: str) -> None:
         from datetime import datetime
