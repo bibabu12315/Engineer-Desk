@@ -178,7 +178,7 @@ class StickyEditor(QTextEdit):
         fmt = QTextCharFormat()
         fmt.setForeground(QColor("#FF9F0A"))
         cursor.setCharFormat(fmt)
-        cursor.insertText("─" * 24)
+        cursor.insertText("─" * 12)
         # 分割线所在块居中（视觉上更像分隔符而非正文）
         cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
         bf = QTextBlockFormat()

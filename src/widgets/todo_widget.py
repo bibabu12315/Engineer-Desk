@@ -1,16 +1,50 @@
 ﻿"""
-Todo 列表自定义控件
+Todo 列表控件（UI 重制版）
 支持新建、删除、修改、勾选完成，显示今日完成数量和任务持续天数
+视觉：圆角自绘复选框（绿底白✓）、发丝线分隔、胶囊操作按钮、完成态灰字划线
 """
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QRect
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QCheckBox,
     QTextEdit, QPushButton, QLabel, QScrollArea, QFrame,
 )
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPainter, QColor, QPen, QFontMetrics
 
 from src.database.db_manager import DatabaseManager
+from src.ui import theme
+
+
+class RoundCheckBox(QCheckBox):
+    """自绘复选框：iOS 风格圆角方块，选中绿底白✓"""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedSize(17, 17)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        r = QRect(1, 1, self.width() - 2, self.height() - 2)
+        if self.isChecked():
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(theme.GREEN))
+            p.drawRoundedRect(r, 5, 5)
+            # 白色对勾
+            pen = QPen(QColor("#FFFFFF"), 1.8)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            p.setPen(pen)
+            w = self.width()
+            h = self.height()
+            p.drawLine(int(w * 0.24), int(h * 0.52), int(w * 0.42), int(h * 0.70))
+            p.drawLine(int(w * 0.42), int(h * 0.70), int(w * 0.76), int(h * 0.30))
+        else:
+            p.setPen(QPen(QColor(theme.TERTIARY), 1.4))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(r, 5, 5)
+        p.end()
 
 
 class TodoItemWidget(QFrame):
@@ -41,11 +75,11 @@ class TodoItemWidget(QFrame):
         )
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 2, 4, 2)
-        layout.setSpacing(6)
+        layout.setContentsMargins(10, 2, 4, 2)
+        layout.setSpacing(8)
 
-        # 完成勾选框
-        self._checkbox: QCheckBox = QCheckBox()
+        # 完成勾选框（自绘圆角）
+        self._checkbox: RoundCheckBox = RoundCheckBox()
         self._checkbox.setChecked(completed)
         self._checkbox.toggled.connect(self._on_toggle)
         layout.addWidget(self._checkbox, 0, Qt.AlignmentFlag.AlignTop)
@@ -56,9 +90,7 @@ class TodoItemWidget(QFrame):
         self._edit.setFrameShape(QTextEdit.Shape.NoFrame)
         self._edit.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._edit.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self._edit.setStyleSheet(
-            "QTextEdit { border: none; background: transparent; }"
-        )
+        self._edit.setStyleSheet("QTextEdit { border: none; background: transparent; }")
         self._edit.setPlainText(content)
         self._edit.setAcceptRichText(False)
         self._edit.document().documentLayout().documentSizeChanged.connect(
@@ -71,7 +103,7 @@ class TodoItemWidget(QFrame):
         days = self._db.calc_days_active(origin_date)
         self._days_label = QLabel()
         self._days_label.setStyleSheet(
-            "color: #aaa; font-size: 10px; padding: 2px 4px;"
+            f"color: {theme.TERTIARY}; font-size: 10px; padding: 2px 4px;"
         )
         if days > 1:
             self._days_label.setText(f"{days}天")
@@ -80,15 +112,34 @@ class TodoItemWidget(QFrame):
 
         # 删除按钮
         self._delete_btn: QPushButton = QPushButton("×")
-        self._delete_btn.setFixedSize(24, 24)
+        self._delete_btn.setFixedSize(20, 20)
         self._delete_btn.setStyleSheet(
-            "QPushButton { border: none; color: #999; font-size: 16px; }"
-            "QPushButton:hover { color: #e74c3c; }"
+            "QPushButton { border: none; border-radius: 6px;"
+            f" color: {theme.TERTIARY}; font-size: 14px; background: transparent; }}"
+            f"QPushButton:hover {{ background: rgba(255,59,48,0.12); color: {theme.RED}; }}"
         )
         self._delete_btn.clicked.connect(lambda: self.remove_requested.emit(self))
         layout.addWidget(self._delete_btn, 0, Qt.AlignmentFlag.AlignTop)
 
+        self._apply_done_style(completed, force=True)
         self._adjust_height()
+
+    # ==================== 完成态样式 ====================
+
+    def _apply_done_style(self, checked: bool, force: bool = False) -> None:
+        """完成态：整段灰字 + 划线（QTextEdit 需用字符格式实现）"""
+        if checked == self._completed and not force:
+            return
+        self._completed = checked
+        cursor = self._edit.textCursor()
+        cursor.select(cursor.SelectionType.Document)
+        from PySide6.QtGui import QTextCharFormat
+        fmt = QTextCharFormat()
+        fmt.setFontStrikeOut(checked)
+        fmt.setForeground(QColor(theme.SECONDARY if checked else theme.LABEL))
+        cursor.mergeCharFormat(fmt)
+        cursor.clearSelection()
+        self._edit.setTextCursor(cursor)
 
     def _adjust_height(self) -> None:
         """根据内容自适应调整控件高度"""
@@ -113,18 +164,10 @@ class TodoItemWidget(QFrame):
         self._checkbox.blockSignals(True)
         self._checkbox.setChecked(completed)
         self._checkbox.blockSignals(False)
+        self._apply_done_style(completed)
 
     def _on_toggle(self, checked: bool) -> None:
-        self._completed = checked
-        if checked:
-            self._edit.setStyleSheet(
-                "QTextEdit { border: none; background: transparent; color: #999;"
-                " text-decoration: line-through; }"
-            )
-        else:
-            self._edit.setStyleSheet(
-                "QTextEdit { border: none; background: transparent; }"
-            )
+        self._apply_done_style(checked)
         self.changed.emit()
 
     def _on_text_changed(self) -> None:
@@ -148,39 +191,46 @@ class TodoListWidget(QWidget):
         """初始化界面"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(2)
 
         header = QHBoxLayout()
-        header.setContentsMargins(8, 4, 8, 4)
+        header.setContentsMargins(10, 2, 10, 2)
 
-        title_label = QLabel("📋 Todo")
-        title_font = QFont()
-        title_font.setBold(True)
-        title_label.setFont(title_font)
+        # 小节标题：小写灰标，视觉退后
+        title_label = QLabel("TODO")
+        title_label.setStyleSheet(
+            f"color: {theme.SECONDARY}; font-size: 10px; font-weight: 600;"
+            " letter-spacing: 1px;"
+        )
         header.addWidget(title_label)
 
         header.addStretch()
 
-        self._count_label = QLabel("完成: 0/0")
-        self._count_label.setStyleSheet("color: #888;")
+        self._count_label = QLabel("0/0")
+        self._count_label.setStyleSheet(
+            f"color: {theme.SECONDARY}; font-size: 11px;"
+            " font-variant-numeric: tabular-nums;"
+        )
         header.addWidget(self._count_label)
 
-        add_btn = QPushButton("+ 新建")
-        add_btn.setFixedHeight(26)
+        add_btn = QPushButton("＋")
+        add_btn.setFixedSize(24, 24)
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setToolTip("新建待办")
         add_btn.setStyleSheet(
-            "QPushButton { border: 1px solid #ddd; border-radius: 4px;"
-            " padding: 2px 10px; background: #f8f8f8; }"
-            "QPushButton:hover { background: #e8e8e8; }"
+            "QPushButton { border: none; border-radius: 8px; font-size: 13px;"
+            f" color: {theme.SECONDARY}; background: transparent; }}"
+            f"QPushButton:hover {{ background: {theme.FILL}; color: {theme.LABEL}; }}"
         )
         add_btn.clicked.connect(self._add_todo)
         header.addWidget(add_btn)
 
         layout.addLayout(header)
 
+        # 发丝线分隔
         sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setStyleSheet("color: #e0e0e0;")
         sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background: {theme.SEPARATOR}; border: none;")
         layout.addWidget(sep)
 
         self._scroll_area = QScrollArea()
@@ -189,9 +239,10 @@ class TodoListWidget(QWidget):
         self._scroll_area.setStyleSheet("QScrollArea { background: transparent; }")
 
         self._list_container = QWidget()
+        self._list_container.setStyleSheet("background: transparent;")
         self._list_layout = QVBoxLayout(self._list_container)
         self._list_layout.setContentsMargins(0, 0, 0, 0)
-        self._list_layout.setSpacing(2)
+        self._list_layout.setSpacing(0)
         self._list_layout.addStretch()
 
         self._scroll_area.setWidget(self._list_container)
@@ -266,8 +317,4 @@ class TodoListWidget(QWidget):
         """更新完成统计"""
         total = len(self._items)
         completed = sum(1 for item in self._items if item.is_completed)
-        self._count_label.setText(f"完成: {completed}/{total}")
-
-    def save_all(self) -> None:
-        """保存所有 Todo 项"""
-        self._on_item_changed()
+        self._count_label.setText(f"完成 {completed}/{total}")

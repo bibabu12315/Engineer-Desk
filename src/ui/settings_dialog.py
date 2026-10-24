@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont, QColor
 
 from src.services.config_manager import ConfigManager
 from src.services.startup_manager import StartupManager
+from src.ui import theme
 
 # 预设背景色 — 参考主流笔记/文本类产品的柔和色调
 PRESET_COLORS = [
@@ -50,6 +51,7 @@ class SettingsDialog(QDialog):
             | Qt.WindowType.WindowStaysOnTopHint
         )
         self.setMinimumSize(420, 480)
+        self.setStyleSheet(theme.dialog_qss())
 
         self._init_ui()
 
@@ -60,11 +62,11 @@ class SettingsDialog(QDialog):
         layout.setSpacing(12)
 
         # 标题
-        title = QLabel("⚙ 设置")
-        title_font = QFont()
-        title_font.setBold(True)
-        title_font.setPointSize(14)
-        title.setFont(title_font)
+        title = QLabel("设置")
+        title.setStyleSheet(
+            f"font-size: 17px; font-weight: 650; letter-spacing: -0.3px;"
+            f" color: {theme.LABEL}; background: transparent;"
+        )
         layout.addWidget(title)
 
         # ===== 外观设置 =====
@@ -142,11 +144,8 @@ class SettingsDialog(QDialog):
         btn_layout.addStretch()
         close_btn = QPushButton("关闭")
         close_btn.setMinimumWidth(80)
-        close_btn.setStyleSheet(
-            "QPushButton { border: 1px solid #ddd; border-radius: 6px;"
-            " padding: 6px 16px; }"
-            "QPushButton:hover { background: #f0f0f0; }"
-        )
+        close_btn.setProperty("qss", "secondary")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         close_btn.clicked.connect(self.accept)
         btn_layout.addWidget(close_btn)
         layout.addLayout(btn_layout)
@@ -154,7 +153,7 @@ class SettingsDialog(QDialog):
     def _create_color_grid(self) -> QFrame:
         """创建预设颜色色块网格"""
         container = QFrame()
-        container.setStyleSheet("QFrame { border: 1px solid #eee; border-radius: 6px; padding: 6px; }")
+        container.setStyleSheet("QFrame { background: transparent; border: none; }")
         grid = QGridLayout(container)
         grid.setSpacing(4)
         grid.setContentsMargins(4, 4, 4, 4)
@@ -168,14 +167,14 @@ class SettingsDialog(QDialog):
             swatch.setCursor(Qt.CursorShape.PointingHandCursor)
             swatch.setToolTip(name)
             # 暗色背景用白色边框区分
-            border_color = "#555" if hex_color == "#2D2D2D" else "#ccc"
+            border_color = "#555" if hex_color == "#2D2D2D" else theme.SEPARATOR
             swatch.setStyleSheet(
                 f"QPushButton {{"
                 f" background-color: {hex_color};"
                 f" border: 1px solid {border_color};"
-                f" border-radius: 4px;"
+                f" border-radius: 8px;"
                 f"}}"
-                f"QPushButton:hover {{ border: 2px solid #4a90d9; }}"
+                f"QPushButton:hover {{ border: 2px solid {theme.ACCENT}; }}"
             )
             swatch.clicked.connect(
                 lambda checked, c=hex_color: self._select_color(c)

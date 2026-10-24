@@ -113,11 +113,20 @@ class StickyNoteWindow(QMainWindow):
         splitter.setHandleWidth(2)
         splitter.setChildrenCollapsible(False)
 
-        # 编辑器容器（编辑器 + 标签栏）
+        # 编辑器容器（面板化：分区模式下显示圆角浅底，单栏时透明）
         editor_container = QWidget()
+        editor_container.setObjectName("recordPane")
         editor_layout = QVBoxLayout(editor_container)
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.setSpacing(2)
+
+        # 面板微标注（仅分区模式显示）
+        self._record_hint = QLabel("记录 · 右键分割线块可归档")
+        self._record_hint.setStyleSheet(
+            f"font-size: 10px; color: {theme.SECONDARY}; padding: 0 4px;"
+        )
+        self._record_hint.hide()
+        editor_layout.addWidget(self._record_hint)
 
         self._editor = StickyEditor()
         self._editor.content_changed.connect(self._auto_save.trigger)
@@ -138,7 +147,23 @@ class StickyNoteWindow(QMainWindow):
         self._draft_editor = StickyEditor()
         self._draft_editor.setPlaceholderText("自由草稿区：随手画箭头、涂涂改改、临时算式…")
         self._draft_editor.content_changed.connect(self._auto_save.trigger)
-        self._h_split.addWidget(self._draft_editor)
+
+        # 草稿面板（与记录面板同构）
+        draft_container = QWidget()
+        draft_container.setObjectName("draftPane")
+        draft_layout = QVBoxLayout(draft_container)
+        draft_layout.setContentsMargins(0, 0, 0, 0)
+        draft_layout.setSpacing(2)
+        self._draft_hint = QLabel("草稿 · 自动保存可搜索")
+        self._draft_hint.setStyleSheet(
+            f"font-size: 10px; color: {theme.SECONDARY}; padding: 0 4px;"
+        )
+        self._draft_hint.hide()
+        draft_layout.addWidget(self._draft_hint)
+        draft_layout.addWidget(self._draft_editor, 1)
+
+        self._h_split.addWidget(editor_container)
+        self._h_split.addWidget(draft_container)
         self._h_split.setSizes([60, 40])
         self._draft_editor.setVisible(False)  # 默认单栏
 
@@ -337,6 +362,25 @@ class StickyNoteWindow(QMainWindow):
         """切换单栏 / 左右分割，并随当前便签按天保存"""
         self._draft_editor.setVisible(on)
         self._split_btn.setStyleSheet(theme.format_btn_on() if on else theme.format_btn())
+
+        # 面板化：分区时左暖右冷两块圆角面板，单栏时透明
+        record_pane = self._editor.parentWidget()
+        draft_pane = self._draft_editor.parentWidget()
+        for pane, name, bg, hint in (
+            (record_pane, "recordPane", theme.PANE_BG, self._record_hint),
+            (draft_pane, "draftPane", theme.DRAFT_BG, self._draft_hint),
+        ):
+            if on:
+                pane.setStyleSheet(
+                    f"QWidget#{name} {{ background: {bg}; border-radius: 12px; }}"
+                )
+                pane.layout().setContentsMargins(8, 4, 8, 8)
+                hint.show()
+            else:
+                pane.setStyleSheet("QWidget { background: transparent; }")
+                pane.layout().setContentsMargins(0, 0, 0, 0)
+                hint.hide()
+
         self._auto_save.trigger()
 
     def _create_toolbar(self) -> QWidget:

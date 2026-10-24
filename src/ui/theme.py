@@ -32,6 +32,7 @@ _LIGHT = dict(
     WARN_SOFT="#FFF0DC", WARN_DEEP="#B26A00",
     BLUE="#007AFF", BLUE_SOFT="#F0F6FF", RED="#FF3B30",
     INPUT_BG="#FFFFFF", SURFACE="#FFFFFF",
+    PANE_BG="#FBF9F2", DRAFT_BG="#F4F3EE",       # 分区：左记录 / 右草稿
 )
 
 _DARK = dict(
@@ -43,6 +44,7 @@ _DARK = dict(
     WARN_SOFT="rgba(255,159,10,0.18)", WARN_DEEP="#FF9F0A",
     BLUE="#0A84FF", BLUE_SOFT="rgba(10,132,255,0.18)", RED="#FF453A",
     INPUT_BG="#2C2C2E", SURFACE="#2C2C2E",
+    PANE_BG="#2A2A2C", DRAFT_BG="#232325",
 )
 
 
@@ -190,13 +192,99 @@ def pill(variant: str = "base") -> str:
         "warn":  (WARN_SOFT, WARN_DEEP, "none"),
         "blue":  (BLUE_SOFT, BLUE, "none"),
         "ghost": ("transparent", SECONDARY, f"0.5px dashed {TERTIARY}"),
+        "primary": (ACCENT, BG, "none"),
     }
     bg, fg, border = m.get(variant, m["base"])
+    weight = "600;" if variant == "primary" else "500;"
     return (
         "QPushButton {"
         + (f" border: {border}; border-radius: 999px;" if border != "none"
            else " border: none; border-radius: 999px;")
-        + f" padding: 1px 11px; font-size: 11px; font-weight: 500;"
+        + f" padding: 2px 12px; font-size: 11px; font-weight: {weight}"
         + f" background: {bg}; color: {fg}; }}"
-        f"QPushButton:hover {{ background: {FILL2 if variant == 'base' else bg}; }}"
+        f"QPushButton:hover {{ background: {ACCENT_HOVER if variant == 'primary' else (FILL2 if variant == 'base' else bg)}; }}"
     )
+
+def dialog_qss() -> str:
+    """对话框通用皮肤：卡片化 GroupBox / 圆角输入 / 主题按钮 / 滑块"""
+    return f"""
+    QDialog {{ background: {BG}; }}
+    QLabel {{ background: transparent; }}
+    QGroupBox {{
+        background: {SURFACE}; border: 0.5px solid {SEPARATOR};
+        border-radius: 12px; margin-top: 12px; padding: 14px 12px 10px;
+        font-size: 13px; font-weight: 600; color: {LABEL};
+    }}
+    QGroupBox::title {{
+        subcontrol-origin: margin; left: 12px; top: 0px;
+        color: {SECONDARY}; font-size: 11px; font-weight: 600;
+    }}
+    QLineEdit, QComboBox {{
+        background: {INPUT_BG}; color: {LABEL};
+        border: 0.5px solid {SEPARATOR}; border-radius: 8px;
+        padding: 4px 8px; font-size: 12px;
+    }}
+    QLineEdit:focus, QComboBox:focus {{ border: 1px solid {ACCENT}; }}
+    QComboBox::drop-down {{ border: none; width: 20px; }}
+    QComboBox QAbstractItemView {{
+        background: {SURFACE}; color: {LABEL};
+        border: 0.5px solid {SEPARATOR}; border-radius: 8px;
+        selection-background-color: {FILL}; selection-color: {LABEL};
+    }}
+    QPushButton[qss="secondary"] {{
+        background: {FILL}; color: {LABEL}; border: none;
+        border-radius: 8px; padding: 5px 16px; font-size: 12px; font-weight: 500;
+    }}
+    QPushButton[qss="secondary"]:hover {{ background: {FILL2}; }}
+    QPushButton[qss="primary"] {{
+        background: {ACCENT}; color: {BG}; border: none;
+        border-radius: 8px; padding: 5px 16px; font-size: 12px; font-weight: 600;
+    }}
+    QPushButton[qss="primary"]:hover {{ background: {ACCENT_HOVER}; }}
+    QCheckBox {{ spacing: 8px; color: {LABEL}; background: transparent; }}
+    QCheckBox::indicator {{
+        width: 16px; height: 16px; border-radius: 5px;
+        border: 1.5px solid {TERTIARY}; background: transparent;
+    }}
+    QCheckBox::indicator:hover {{ border-color: {SECONDARY}; }}
+    QSlider::groove:horizontal {{
+        height: 4px; border-radius: 2px; background: {FILL2};
+    }}
+    QSlider::handle:horizontal {{
+        width: 18px; height: 18px; margin: -7px 0;
+        border-radius: 9px; background: {SURFACE};
+        border: 0.5px solid {SEPARATOR};
+    }}
+    QSlider::handle:horizontal:hover {{ border: 1.5px solid {ACCENT}; }}
+    QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 2px; }}
+    """
+
+def calendar_qss() -> str:
+    """QCalendarWidget 皮肤：去网格线、导航条融入卡片、 today 圆形强调"""
+    return f"""
+    QCalendarWidget {{
+        background: {SURFACE}; color: {LABEL}; border: none;
+    }}
+    QCalendarWidget QWidget#qt_calendar_navigationbar {{
+        background: transparent; border-bottom: 0.5px solid {SEPARATOR};
+        min-height: 34px;
+    }}
+    QCalendarWidget QToolButton {{
+        background: transparent; color: {LABEL};
+        border: none; border-radius: 8px; padding: 4px 10px;
+        font-size: 13px; font-weight: 600;
+    }}
+    QCalendarWidget QToolButton:hover {{ background: {FILL}; }}
+    QCalendarWidget QToolButton::menu-indicator {{ image: none; }}
+    QCalendarWidget QSpinBox {{ background: {INPUT_BG}; color: {LABEL};
+        border: 0.5px solid {SEPARATOR}; border-radius: 6px; }}
+    QCalendarWidget QAbstractItemView:enabled {{
+        color: {LABEL}; background: {SURFACE};
+        selection-background-color: {ACCENT_SOFT};
+        selection-color: {WARN_DEEP}; outline: none;
+    }}
+    QCalendarWidget QAbstractItemView:disabled {{ color: {TERTIARY}; }}
+    QCalendarWidget QWidget#qt_calendar_calendarview {{
+        outline: none; border: none; background: {SURFACE};
+    }}
+    """
