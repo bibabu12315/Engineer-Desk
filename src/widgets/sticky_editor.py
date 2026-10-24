@@ -17,8 +17,15 @@ class StickyEditor(QTextEdit):
 
     content_changed = Signal()  # 内容变更信号
 
-    # 高亮颜色（与便签黄底协调）
-    _HIGHLIGHT = QColor("#FFE58F")
+    # 高亮标准色（荧光笔风格，小巧够用）
+    HIGHLIGHT_COLORS: list[tuple[str, str]] = [
+        ("黄", "#FFF176"),
+        ("绿", "#A5D6A7"),
+        ("蓝", "#90CAF9"),
+        ("粉", "#F48FB1"),
+        ("橙", "#FFB74D"),
+        ("紫", "#CE93D8"),
+    ]
     # 待办行前缀字符
     _TODO_OPEN = "☐ "
     _TODO_DONE = "☑ "
@@ -126,13 +133,13 @@ class StickyEditor(QTextEdit):
         fmt.setFontStrikeOut(not self.textCursor().charFormat().fontStrikeOut())
         self._merge_fmt(fmt)
 
-    def toggle_highlight(self) -> None:
+    def set_highlight(self, color: QColor | None) -> None:
+        """给选区设置高亮色；color 为 None 表示清除高亮"""
         fmt = QTextCharFormat()
-        cur = self.textCursor().charFormat().background().color()
-        if cur.isValid() and cur.alpha() > 0:
+        if color is None:
             fmt.setBackground(QBrush(Qt.BrushStyle.NoBrush))
         else:
-            fmt.setBackground(self._HIGHLIGHT)
+            fmt.setBackground(color)
         self._merge_fmt(fmt)
 
     def toggle_todo_line(self) -> None:

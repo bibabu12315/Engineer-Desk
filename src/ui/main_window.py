@@ -242,7 +242,7 @@ class StickyNoteWindow(QMainWindow):
         return bar
 
     def _create_format_bar(self) -> QWidget:
-        """创建格式工具栏（Word 式按钮，无 Markdown 语法记忆负担）"""
+        """创建格式工具栏（Word 式按钮，无 Markdown 语法记忆负担），按钮靠右"""
         bar = QWidget()
         bar.setFixedHeight(28)
         bar.setStyleSheet("background: transparent;")
@@ -250,6 +250,7 @@ class StickyNoteWindow(QMainWindow):
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
         layout.setSpacing(4)
+        layout.addStretch()  # 按钮右对齐
 
         btn_style = (
             "QPushButton { border: 0.5px solid rgba(0,0,0,0.18); border-radius: 4px;"
@@ -257,23 +258,34 @@ class StickyNoteWindow(QMainWindow):
             "QPushButton:hover { background: rgba(255,255,255,1); color: #222; }"
         )
 
-        def add_btn(text: str, tooltip: str, slot, width: int = 26) -> None:
+        def add_btn(text: str, tooltip: str, slot, width: int = 26) -> QPushButton:
             btn = QPushButton(text)
             btn.setFixedSize(width, 22)
             btn.setToolTip(tooltip)
             btn.setStyleSheet(btn_style)
             btn.clicked.connect(slot)
             layout.addWidget(btn)
+            return btn
 
         add_btn("B", "加粗", self._editor.toggle_bold)
         add_btn("I", "斜体", self._editor.toggle_italic)
         add_btn("S", "删除线", self._editor.toggle_strike)
         add_btn("U", "下划线", self._editor.toggle_underline)
-        add_btn("🖍", "高亮", self._editor.toggle_highlight)
+
+        highlight_btn = add_btn("🖍", "高亮（选色）", lambda: None)
+        highlight_menu = QMenu(highlight_btn)
+        highlight_menu.addAction("无填充", lambda: self._editor.set_highlight(None))
+        highlight_menu.addSeparator()
+        for name, hex_color in StickyEditor.HIGHLIGHT_COLORS:
+            highlight_menu.addAction(
+                f"● {name}",
+                lambda c=QColor(hex_color): self._editor.set_highlight(c),
+            )
+        highlight_btn.setMenu(highlight_menu)
+
         add_btn("☑", "当前行切换为待办行", self._editor.toggle_todo_line)
         add_btn("⎺", "插入分割线（划出一个可归档的块）", self._editor.insert_divider)
 
-        layout.addStretch()
         return bar
 
     def _create_toolbar(self) -> QWidget:
