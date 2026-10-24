@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 
 from src.ui.main_window import StickyNoteWindow
 from src.ui.system_tray import SystemTray
+from src.ui import theme
 
 
 def main() -> None:
@@ -27,6 +28,10 @@ def main() -> None:
     app.setApplicationName("EngineerDesk")
     app.setOrganizationName("EngineerDesk")
     app.setQuitOnLastWindowClosed(False)  # 关闭窗口不退出程序
+
+    # 全局设计令牌（iOS 质感主题，见 docs/EngineerDesk-ui-redesign.html）
+    theme.init(app)  # 先按系统深浅色定调色板（UI-e：跟随系统暗色）
+    app.setStyleSheet(theme.app_qss())
 
     # 创建主窗口
     window = StickyNoteWindow()

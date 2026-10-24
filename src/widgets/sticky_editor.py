@@ -167,7 +167,7 @@ class StickyEditor(QTextEdit):
         cursor.endEditBlock()
 
     def insert_divider(self) -> None:
-        """光标处插入分割线（红色长划线文本块，另起一段）
+        """光标处插入分割线（品牌橙细划线，另起一段，居中）
 
         不用 <hr>：QTextEdit 导出 HTML 时 hr 之后的内容会丢失。
         """
@@ -176,10 +176,19 @@ class StickyEditor(QTextEdit):
         if cursor.block().text().strip():
             cursor.insertBlock()
         fmt = QTextCharFormat()
-        fmt.setForeground(QColor("#E24B4A"))
+        fmt.setForeground(QColor("#FF9F0A"))
         cursor.setCharFormat(fmt)
         cursor.insertText("─" * 24)
+        # 分割线所在块居中（视觉上更像分隔符而非正文）
+        cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
+        bf = QTextBlockFormat()
+        bf.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cursor.setBlockFormat(bf)
+        cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
         cursor.insertBlock()
+        bf = QTextBlockFormat()
+        bf.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        cursor.setBlockFormat(bf)
         cursor.setCharFormat(QTextCharFormat())
         cursor.endEditBlock()
 

@@ -12,18 +12,13 @@ from PySide6.QtWidgets import (
 
 from src.database.db_manager import DatabaseManager
 from src.widgets.project_dialog import ProjectDialog, days_since, STALE_DAYS
+from src.ui import theme
 
 
 class ProjectCapsuleBar(QWidget):
     """底部项目胶囊条"""
 
     projects_changed = Signal()  # 项目数据发生变化（供外部刷新）
-
-    _CAPSULE_STYLE = (
-        "QPushButton {{ border: 0.5px solid {border}; border-radius: 10px;"
-        " padding: 1px 10px; font-size: 11px; background: {bg}; color: {fg}; }}"
-        "QPushButton:hover {{ background: {hover}; }}"
-    )
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -70,9 +65,7 @@ class ProjectCapsuleBar(QWidget):
 
         add_btn = QPushButton("+ 项目")
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        add_btn.setStyleSheet(self._CAPSULE_STYLE.format(
-            bg="transparent", fg="#888780", border="rgba(0,0,0,0.25)", hover="#fff"
-        ))
+        add_btn.setStyleSheet(theme.pill("ghost"))
         add_btn.setToolTip("新建项目（名称 + 可选 emoji 图标）")
         add_btn.clicked.connect(self._create_project)
         self._inner_layout.addWidget(add_btn)
@@ -87,20 +80,13 @@ class ProjectCapsuleBar(QWidget):
         days = days_since(project["sort_active_at"])
         if days >= STALE_DAYS:
             # × 天没碰：橙色提示
-            btn.setStyleSheet(self._CAPSULE_STYLE.format(
-                bg="#FAEEDA", fg="#854F0B", border="#E2C28C", hover="#F6E3C4"
-            ))
+            btn.setStyleSheet(theme.pill("warn"))
             btn.setText(label + f" · {days}天没碰")
         elif project["total"] > 0 and project["done"] >= project["total"]:
             # 全部完成：绿色
-            btn.setStyleSheet(self._CAPSULE_STYLE.format(
-                bg="#E1F5EE", fg="#085041", border="#5DCAA5", hover="#d0efdd"
-            ))
+            btn.setStyleSheet(theme.pill("green"))
         else:
-            btn.setStyleSheet(self._CAPSULE_STYLE.format(
-                bg="rgba(0,0,0,0.04)", fg="#5F5E5A", border="rgba(0,0,0,0.15)",
-                hover="rgba(255,255,255,0.9)"
-            ))
+            btn.setStyleSheet(theme.pill("base"))
 
         btn.clicked.connect(
             lambda checked=False, pid=project["id"]: self._open_dialog(pid, btn)

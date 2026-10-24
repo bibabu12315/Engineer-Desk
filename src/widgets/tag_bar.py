@@ -45,14 +45,10 @@ class TagBar(QWidget):
             btn.setFixedHeight(22)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setStyleSheet(
-                "QPushButton {"
-                " border: 1px solid #c0c0c0; border-radius: 10px;"
-                " padding: 0 8px; font-size: 11px;"
-                " background: #f0f0f0; color: #555;"
-                "}"
-                "QPushButton:hover {"
-                " background: #e0e0e0; color: #333;"
-                "}"
+                "QPushButton { border: none; border-radius: 999px;"
+                " padding: 0 10px; font-size: 11px; font-weight: 500;"
+                " background: rgba(120,120,128,0.08); color: #5F5E5A; }"
+                "QPushButton:hover { background: rgba(120,120,128,0.16); color: #1C1C1E; }"
             )
             # 用默认参数捕获当前 tag 值
             btn.clicked.connect(

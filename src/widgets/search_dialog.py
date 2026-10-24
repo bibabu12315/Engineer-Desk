@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QFont
 
 from src.database.db_manager import DatabaseManager
+from src.ui import theme
 
 
 class SearchDialog(QDialog):
@@ -42,8 +43,8 @@ class SearchDialog(QDialog):
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText("搜索标题、正文或标签...")
         self._search_input.setStyleSheet(
-            "QLineEdit { border: 1px solid #ddd; border-radius: 6px;"
-            " padding: 6px 10px; font-size: 13px; }"
+            "QLineEdit { border: 0.5px solid " + theme.SEPARATOR + "; border-radius: 8px;"
+            " padding: 6px 10px; font-size: 13px; background: " + theme.INPUT_BG + "; }"
         )
         self._search_input.returnPressed.connect(self._do_search)
         search_layout.addWidget(self._search_input)
@@ -66,12 +67,12 @@ class SearchDialog(QDialog):
 
         # 结果列表
         self._result_count = QLabel("")
-        self._result_count.setStyleSheet("color: #888; font-size: 11px;")
+        self._result_count.setStyleSheet(f"color: {theme.SECONDARY}; font-size: 11px;")
         layout.addWidget(self._result_count)
 
         self._results_list = QListWidget()
         self._results_list.setStyleSheet(
-            "QListWidget { border: 1px solid #eee; border-radius: 6px; }"
+            "QListWidget { border: 0.5px solid " + theme.SEPARATOR + "; border-radius: 10px; background: transparent; }"
         )
         self._results_list.itemDoubleClicked.connect(self._on_result_clicked)
         layout.addWidget(self._results_list, 1)

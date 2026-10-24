@@ -213,6 +213,15 @@ class DatabaseManager:
             except sqlite3.Error:
                 pass
 
+        # UI 重设计：旧默认底色（纯黄）一次性迁移为暖纸白
+        try:
+            cursor.execute(
+                "UPDATE sticky_notes SET bg_color = '#FFFDF8' WHERE bg_color = '#FFFDE7'"
+            )
+            self._conn.commit()
+        except sqlite3.Error:
+            pass
+
     @property
     def conn(self) -> sqlite3.Connection:
         """获取数据库连接"""

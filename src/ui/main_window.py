@@ -29,6 +29,7 @@ from src.widgets.calendar_dialog import CalendarDialog
 from src.widgets.search_dialog import SearchDialog
 from src.widgets.project_capsule_bar import ProjectCapsuleBar
 from src.ui.settings_dialog import SettingsDialog
+from src.ui import theme
 
 
 class StickyNoteWindow(QMainWindow):
@@ -178,9 +179,7 @@ class StickyNoteWindow(QMainWindow):
         bar = QWidget()
         bar.setFixedHeight(36)
         bar.setObjectName("titleBar")
-        bar.setStyleSheet(
-            "#titleBar { background: rgba(0,0,0,0.05); border-radius: 8px; }"
-        )
+        bar.setStyleSheet("#titleBar { background: transparent; }")
 
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 2, 4, 2)
@@ -212,9 +211,9 @@ class StickyNoteWindow(QMainWindow):
         self._title_edit.textChanged.connect(self._auto_save.trigger)
         layout.addWidget(self._title_edit, 1)
 
-        # 日期标签
+        # 日期胶囊（等宽数字 + 星期）
         self._date_label = QLabel("")
-        self._date_label.setStyleSheet("color: #aaa; font-size: 10px; padding: 0 4px;")
+        self._date_label.setStyleSheet(theme.date_chip())
         layout.addWidget(self._date_label)
 
         # 搜索按钮
@@ -252,10 +251,7 @@ class StickyNoteWindow(QMainWindow):
         close_btn = QPushButton("×")
         close_btn.setFixedSize(26, 26)
         close_btn.setToolTip("隐藏到托盘")
-        close_btn.setStyleSheet(
-            "QPushButton { border: none; font-size: 18px; color: #999; }"
-            "QPushButton:hover { color: #e74c3c; }"
-        )
+        close_btn.setStyleSheet(theme.close_btn())
         close_btn.clicked.connect(self.hide_to_tray)
         layout.addWidget(close_btn)
 
@@ -272,11 +268,7 @@ class StickyNoteWindow(QMainWindow):
         layout.setSpacing(4)
         layout.addStretch()  # 按钮右对齐
 
-        btn_style = (
-            "QPushButton { border: 0.5px solid rgba(0,0,0,0.18); border-radius: 4px;"
-            " background: rgba(255,255,255,0.75); color: #555; font-size: 12px; }"
-            "QPushButton:hover { background: rgba(255,255,255,1); color: #222; }"
-        )
+        btn_style = theme.format_btn()
 
         def add_btn(text: str, tooltip: str, slot, width: int = 26) -> QPushButton:
             btn = QPushButton(text)
@@ -294,13 +286,7 @@ class StickyNoteWindow(QMainWindow):
 
         highlight_btn = add_btn("🖍", "高亮（选色）", lambda: None)
         highlight_menu = QMenu(highlight_btn)
-        highlight_menu.setStyleSheet(
-            "QMenu { background: #ffffff; color: #333;"
-            " border: 0.5px solid rgba(0,0,0,0.25); border-radius: 6px; padding: 4px; }"
-            "QMenu::item { padding: 4px 18px 4px 8px; border-radius: 4px; }"
-            "QMenu::item:selected { background: #E6F1FB; }"
-            "QMenu::separator { height: 1px; background: rgba(0,0,0,0.12); margin: 3px 6px; }"
-        )
+        # 菜单样式走全局 QSS（随深浅色模式切换）
         self._hl_cursor: QTextCursor | None = None  # 打开菜单时的选区快照
 
         def snapshot_selection() -> None:
@@ -344,32 +330,20 @@ class StickyNoteWindow(QMainWindow):
 
     # ==================== 左右分割（V2.0-b） ====================
 
-    _SPLIT_BTN_ON = (
-        "QPushButton { border: 0.5px solid #BA7517; border-radius: 4px;"
-        " background: #BA7517; color: #fff; font-size: 12px; }"
-    )
-
     def _toggle_split(self) -> None:
         self._set_split_mode(not self._draft_editor.isVisible())
 
     def _set_split_mode(self, on: bool) -> None:
         """切换单栏 / 左右分割，并随当前便签按天保存"""
         self._draft_editor.setVisible(on)
-        if on:
-            self._split_btn.setStyleSheet(self._SPLIT_BTN_ON)
-        else:
-            self._split_btn.setStyleSheet(
-                "QPushButton { border: 0.5px solid rgba(0,0,0,0.18); border-radius: 4px;"
-                " background: rgba(255,255,255,0.75); color: #555; font-size: 12px; }"
-                "QPushButton:hover { background: rgba(255,255,255,1); color: #222; }"
-            )
+        self._split_btn.setStyleSheet(theme.format_btn_on() if on else theme.format_btn())
         self._auto_save.trigger()
 
     def _create_toolbar(self) -> QWidget:
         """创建底部工具栏"""
         bar = QWidget()
         bar.setFixedHeight(26)
-        bar.setStyleSheet("background: rgba(0,0,0,0.03); border-radius: 0 0 8px 8px;")
+        bar.setStyleSheet("background: transparent;")
 
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 0, 10, 0)
@@ -379,8 +353,8 @@ class StickyNoteWindow(QMainWindow):
         self._quick_prev_btn.setFixedSize(20, 20)
         self._quick_prev_btn.setToolTip("前一天")
         self._quick_prev_btn.setStyleSheet(
-            "QPushButton { border: none; color: #888; font-size: 10px; }"
-            "QPushButton:hover { color: #333; }"
+            "QPushButton { border: none; color: " + theme.SECONDARY + "; font-size: 10px; }"
+            "QPushButton:hover { color: " + theme.LABEL + "; }"
         )
         self._quick_prev_btn.clicked.connect(lambda: self._navigate_date("prev"))
         layout.addWidget(self._quick_prev_btn)
@@ -389,8 +363,8 @@ class StickyNoteWindow(QMainWindow):
         today_btn = QPushButton("回到今天")
         today_btn.setFixedHeight(20)
         today_btn.setStyleSheet(
-            "QPushButton { border: none; color: #888; font-size: 10px; }"
-            "QPushButton:hover { color: #333; }"
+            "QPushButton { border: none; color: " + theme.SECONDARY + "; font-size: 10px; }"
+            "QPushButton:hover { color: " + theme.LABEL + "; }"
         )
         today_btn.clicked.connect(self._goto_today)
         layout.addWidget(today_btn)
@@ -400,8 +374,8 @@ class StickyNoteWindow(QMainWindow):
         self._quick_next_btn.setFixedSize(20, 20)
         self._quick_next_btn.setToolTip("后一天")
         self._quick_next_btn.setStyleSheet(
-            "QPushButton { border: none; color: #888; font-size: 10px; }"
-            "QPushButton:hover { color: #333; }"
+            "QPushButton { border: none; color: " + theme.SECONDARY + "; font-size: 10px; }"
+            "QPushButton:hover { color: " + theme.LABEL + "; }"
         )
         self._quick_next_btn.clicked.connect(lambda: self._navigate_date("next"))
         layout.addWidget(self._quick_next_btn)
@@ -412,7 +386,7 @@ class StickyNoteWindow(QMainWindow):
         self._carry_btn.setToolTip("将未完成的 Todo 顺延到当前查看日期的下一天")
         self._carry_btn.setStyleSheet(
             "QPushButton { border: none; color: #888; font-size: 10px; }"
-            "QPushButton:hover { color: #4a90d9; }"
+            "QPushButton:hover { color: " + theme.BLUE + "; }"
         )
         self._carry_btn.clicked.connect(self._carry_over_todos)
         layout.addWidget(self._carry_btn)
@@ -425,13 +399,13 @@ class StickyNoteWindow(QMainWindow):
         self._center_btn.setToolTip("移动到主屏幕中央")
         self._center_btn.setStyleSheet(
             "QPushButton { border: none; color: #888; font-size: 13px; }"
-            "QPushButton:hover { color: #4a90d9; }"
+            "QPushButton:hover { color: " + theme.BLUE + "; }"
         )
         self._center_btn.clicked.connect(lambda: self.center_on_primary_screen())
         layout.addWidget(self._center_btn)
 
         self._save_status = QLabel("")
-        self._save_status.setStyleSheet("color: #4caf50; font-size: 10px;")
+        self._save_status.setStyleSheet(f"color: {theme.GREEN}; font-size: 10px;")
         layout.addWidget(self._save_status)
 
         return bar
@@ -562,19 +536,13 @@ class StickyNoteWindow(QMainWindow):
 
     @staticmethod
     def _icon_btn_style() -> str:
-        """通用图标按钮样式"""
-        return (
-            "QPushButton { border: none; font-size: 14px; color: #888; }"
-            "QPushButton:hover { color: #333; }"
-        )
+        """通用图标按钮样式（主题令牌）"""
+        return theme.icon_btn()
 
     @staticmethod
     def _nav_btn_style() -> str:
-        """导航按钮样式"""
-        return (
-            "QPushButton { border: none; font-size: 10px; color: #bbb; }"
-            "QPushButton:hover { color: #555; }"
-        )
+        """导航按钮样式（主题令牌）"""
+        return theme.nav_btn()
 
     # ==================== 置顶切换 ====================
 
@@ -585,16 +553,7 @@ class StickyNoteWindow(QMainWindow):
         self._config.set("always_on_top", "1" if self._is_pinned else "0")
 
         # 更新按钮外观
-        if self._is_pinned:
-            self._pin_btn.setText("📌")
-            self._pin_btn.setStyleSheet(
-                "QPushButton { border: none; font-size: 14px; color: #e74c3c; }"
-            )
-        else:
-            self._pin_btn.setText("📍")
-            self._pin_btn.setStyleSheet(
-                "QPushButton { border: none; font-size: 14px; color: #ccc; }"
-            )
+        self._update_pin_display()
 
     def _update_window_flags(self) -> None:
         """更新窗口标志（置顶/非置顶）"""
@@ -666,10 +625,24 @@ class StickyNoteWindow(QMainWindow):
         self._tag_bar.set_tags(self._db.get_tags(self._note_id))
 
         # 更新日期标签
-        self._date_label.setText(note["date"])
+        self._date_label.setText(self._format_date_chip(note["date"]))
+
+        # 底色：用户自定义保留，默认色跟随深浅模式
+        self._apply_bg_style(theme.note_paper(note["bg_color"] or theme.PAPER_LIGHT))
 
         # 加载 Todo
         self._todo_list.load(self._note_id)
+
+
+    @staticmethod
+    def _format_date_chip(date_str: str) -> str:
+        """日期胶囊文本：MM-DD 周X（解析失败回退原文）"""
+        from datetime import datetime
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+            return f"{d.strftime('%m-%d')} {['周一','周二','周三','周四','周五','周六','周日'][d.weekday()]}"
+        except (ValueError, TypeError):
+            return date_str or ""
 
     def _update_nav_buttons(self) -> None:
         """更新导航按钮状态"""
@@ -798,7 +771,7 @@ class StickyNoteWindow(QMainWindow):
         self.centralWidget().setStyleSheet(
             f"#centralWidget {{"
             f" background-color: {color};"
-            f" border-radius: 10px;"
+            f" border-radius: 18px;"
             f" }}"
         )
 
@@ -823,7 +796,7 @@ class StickyNoteWindow(QMainWindow):
         self._draft_editor.blockSignals(False)
         self._set_split_mode(bool(note["split_mode"]))
 
-        self._apply_bg_style(note["bg_color"] or "#FFFDE7")
+        self._apply_bg_style(theme.note_paper(note["bg_color"] or theme.PAPER_LIGHT))
         self.setWindowOpacity(note["opacity"] or 0.92)
 
         w = note["width"] or 400
@@ -837,7 +810,7 @@ class StickyNoteWindow(QMainWindow):
         self._tag_bar.set_tags(self._db.get_tags(self._note_id))
 
         # 日期
-        self._date_label.setText(note["date"])
+        self._date_label.setText(self._format_date_chip(note["date"]))
 
         # Todo
         self._todo_list.load(self._note_id)
@@ -850,17 +823,17 @@ class StickyNoteWindow(QMainWindow):
         self._ensure_on_screen()
 
     def _update_pin_display(self) -> None:
-        """更新置顶按钮的显示状态"""
+        """更新置顶按钮的显示状态（钉住=红色，未钉=灰色）"""
         if self._is_pinned:
             self._pin_btn.setText("📌")
             self._pin_btn.setStyleSheet(
-                "QPushButton { border: none; font-size: 14px; color: #e74c3c; }"
+                f"QPushButton {{ border: none; border-radius: 8px; font-size: 13px;"
+                f" color: {theme.RED}; background: transparent; }}"
+                f"QPushButton:hover {{ background: {theme.FILL}; }}"
             )
         else:
             self._pin_btn.setText("📍")
-            self._pin_btn.setStyleSheet(
-                "QPushButton { border: none; font-size: 14px; color: #ccc; }"
-            )
+            self._pin_btn.setStyleSheet(theme.icon_btn())
 
     def _save_all(self) -> None:
         """保存所有数据到数据库"""
@@ -900,7 +873,7 @@ class StickyNoteWindow(QMainWindow):
         style = self.centralWidget().styleSheet()
         import re
         match = re.search(r"background-color:\s*([^;]+)", style)
-        return match.group(1).strip() if match else "#FFFDE7"
+        return match.group(1).strip() if match else theme.BG
 
     def hide_to_tray(self) -> None:
         """隐藏到系统托盘"""
