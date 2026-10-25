@@ -1,0 +1,30 @@
+#!/bin/sh
+# 提交前护栏：本地数据与隐私文件不允许进仓库
+# 由 Agent 自动生成，可用 `git config --unset core.hooksPath` 关闭
+
+set -e
+
+# 1) 禁止的目录 / 文件
+BAD_DIRS=".workbuddy/ data/"
+BAD_PATTERN='(\.db$|\.db-shm$|\.db-wal$|\.sqlite$|\.sqlite3$|\.sqlite-journal$|/\.env$|id_rsa|\.pem$|\.keystore$)'
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+hit=0
+for f in $staged; do
+  case "$f" in
+    .workbuddy/*|data/engineer_desk.db*|*.pyz) hit=1; echo "[HOOK] 拒绝提交本地数据：$f" ;;
+  esac
+  echo "$f" | grep -Eq "$BAD_PATTERN" && { hit=1; echo "[HOOK] 拒绝提交敏感/本地文件：$f"; }
+done
+
+if [ "$hit" -ne 0 ]; then
+  echo ""
+  echo "[HOOK] 已阻止本次提交。"
+  echo "       Engineer Desk 的笔记数据存于 data/*.db，属于本机私有，禁止随仓库同步。"
+  echo "       若确实要提交，先确认内容脱敏，再执行：git commit --no-verify"
+  exit 1
+fi
+
+exit 0
