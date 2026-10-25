@@ -111,6 +111,8 @@ export function shapeToElements(
     const cd: Record<string, any> = { ...(el.customData ?? {}), ...meta };
     // 标题右对齐：Excalidraw 文本元素的 x 是文本框左缘，需按实测宽度回移
     let x = el.x;
+    let width = el.width;
+    let height = el.height;
     const raw = el.customData as any;
     if (raw?.role === "caption") {
       x = meta.bbox.x + meta.bbox.w - (el.width ?? 0);
@@ -118,9 +120,21 @@ export function shapeToElements(
       // T1/T2 编号在标注线下方居中
       x = raw.markerX - (el.width ?? 0) / 2;
     }
+    // 关键修复：骨架转换不保证 line 的 width/height 与 points 边界一致，
+    // 而画布缩放用 width/height 算比例、渲染用 points —— 不一致会导致
+    // 拉伸后波形塌缩成一条短线。这里按 points 实际边界强制补正。
+    if (el.type === "line" && Array.isArray((el as any).points)) {
+      const pts = (el as any).points as number[][];
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      width = Math.max(...xs) - Math.min(...xs);
+      height = Math.max(...ys) - Math.min(...ys);
+    }
     return {
       ...el,
       x,
+      width,
+      height,
       groupIds: [...(el.groupIds ?? []), meta.groupId],
       customData: cd,
     };

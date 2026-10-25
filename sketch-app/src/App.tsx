@@ -5,12 +5,13 @@ import WavePanel from "./WavePanel";
 import GhostOverlay from "./GhostOverlay";
 import { usePlaceTool } from "./usePlaceTool";
 import {
-  clampParams,
   defaultParams,
   getFamily,
   listFamilies,
 } from "./wavegen/registry";
 import { commitWave, hitTestWave } from "./wavegen/place";
+import { clampParams } from "./wavegen/registry";
+import { waveMetaOf } from "./wavegen/toElements";
 import type { Params } from "./wavegen/types";
 
 // 波形族注册（副作用导入）：新增波形在此加一行，面板自动多一个 tab
@@ -223,6 +224,89 @@ export default function App() {
     return () => host.removeEventListener("dblclick", onDbl, true);
   }, [api]);
 
+  /* ---------------- 拉伸后按参数重生成（自由缩放） ----------------
+   * Excalidraw 对含零尺寸线/文本的混合组只允许等比缩放，且直接缩放会拉歪折线。
+   * 这里在交互结束后测量波形组的实际画幅，若与生成时不同，就用同一套参数
+   * 重画到新画幅 —— 周期数/占空比不变，宽高都可自由改。
+   */
+  useEffect(() => {
+    const host = stageRef.current;
+    if (!host || !api) return;
+
+    const check = () => {
+      const els = api.getSceneElements() as any[];
+      const st = api.getAppState() as any;
+      const selMap = st?.selectedElementIds ?? {};
+      const selIds: string[] = Object.keys(selMap).filter((id) => selMap[id]);
+      if (!selIds.length) return;
+
+      // 选中的波形组（去重，只处理一个组）
+      const groupIds = new Set<string>();
+      for (const id of selIds) {
+        const el = els.find((e) => e.id === id);
+        const meta = el ? waveMetaOf(el) : null;
+        if (meta) groupIds.add(meta.groupId);
+      }
+      if (groupIds.size !== 1) return;
+      const [groupId] = Array.from(groupIds);
+
+      const groupEls = els.filter((e) => (e.groupIds ?? []).includes(groupId));
+      if (!groupEls.length) return;
+      const meta = waveMetaOf(groupEls[0]);
+      if (!meta) return;
+
+      // 当前实际画幅（line 需按 points 计算，光看 x/width 会漏掉折线负值）
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const el of groupEls) {
+        const pts = Array.isArray(el.points) ? el.points : null;
+        if (el.type === "line" && pts) {
+          for (const p of pts) {
+            minX = Math.min(minX, el.x + p[0]);
+            maxX = Math.max(maxX, el.x + p[0]);
+            minY = Math.min(minY, el.y + p[1]);
+            maxY = Math.max(maxY, el.y + p[1]);
+          }
+        } else {
+          minX = Math.min(minX, el.x);
+          maxX = Math.max(maxX, el.x + el.width);
+          minY = Math.min(minY, el.y);
+          maxY = Math.max(maxY, el.y + el.height);
+        }
+      }
+      const box = {
+        x: minX,
+        y: minY,
+        w: maxX - minX,
+        h: maxY - minY,
+      };
+
+      const tol = 1.5;
+      if (
+        Math.abs(box.x - meta.bbox.x) < tol &&
+        Math.abs(box.y - meta.bbox.y) < tol &&
+        Math.abs(box.w - meta.bbox.w) < tol &&
+        Math.abs(box.h - meta.bbox.h) < tol
+      ) {
+        return; // 没真正改变尺寸（如单纯点选）
+      }
+
+      const fam = getFamily(meta.waveFamily);
+      if (!fam) return;
+      commitWave(api, fam, clampParams(fam, meta.params), box, {
+        replaceGroupId: groupId,
+        select: true,
+      });
+    };
+
+    const onEnd = () => window.setTimeout(check, 0);
+    host.addEventListener("pointerup", onEnd, true);
+    host.addEventListener("pointercancel", onEnd, true);
+    return () => {
+      host.removeEventListener("pointerup", onEnd, true);
+      host.removeEventListener("pointercancel", onEnd, true);
+    };
+  }, [api]);
+
   /* ---------------- 快捷键 ---------------- */
 
   useEffect(() => {
@@ -270,6 +354,21 @@ export default function App() {
       commitWave(api, fam, params, { x: 120, y: 160, w: 560, h: 240 }, {
         select: false,
       });
+      // 调试 dump：把 line 元素的 width/height 与 points 边界写到 DOM 属性，供无头验证
+      const els = api.getSceneElements().filter((e) => e.type === "line");
+      document.body.dataset.debugWaves = JSON.stringify(
+        els.map((e) => {
+          const pts = (e as any).points as number[][];
+          const xs = pts.map((p) => p[0]);
+          const ys = pts.map((p) => p[1]);
+          return {
+            w: e.width,
+            h: e.height,
+            pw: Math.max(...xs) - Math.min(...xs),
+            ph: Math.max(...ys) - Math.min(...ys),
+          };
+        })
+      );
     }, 800);
     return () => window.clearTimeout(t);
   }, [api]);

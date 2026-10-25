@@ -93,3 +93,5 @@ URL 参数，仅显式触发：
 Rev4 补充（同日第 2 轮反馈）：**T1~T4 文字标记整体去掉**，红色虚线保留（仍只标第一周期死区）。改动仅 `pwm.ts` 一处（markers 不再带 label），已截图验证。
 
 Rev4 补充（同日第 3 轮反馈）：**死区 = 0 时不再画红色虚线**（无死区就无标注意义）。`pwm.ts` 加 `if (dt > 0)`；自检钩子支持 `?demo=pwm&dt=0|1` 覆盖死区参数，dt=0 / dt=1 两组截图均已验证。
+
+Rev4 补充（同日第 4 轮反馈）：**修复拉伸后波形塌缩**。根因：骨架转换出的 line 元素 `width/height` 与 points 边界不一致（渲染走 points 所以初始正常，画布缩放按 width/height 算比例，比例算错即塌缩成短线）。修复：`toElements.ts` 转换后按 points 实际边界强制补正 width/height；`?demo=` 落图后会把各 line 的 w/h 与 points 边界写到 `body[data-debug-waves]` 供无头复查（已验证一致）。**旧场景里已保存的波形组仍带错误尺寸，重新生成或双击回填重生成即可修复。**
