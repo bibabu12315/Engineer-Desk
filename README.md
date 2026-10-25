@@ -45,6 +45,50 @@
 - 便签格式栏 ✏️ 打开，系统浏览器全功能手绘白板（完全本地运行）
 - **波形生成器**：PWM（单路 / 互补 + 死区）与三角波（向上 / 中央对齐 / 向下），单击放置、拖拽定大小，双击波形可回填参数原位重生成
 
+## 数据存在哪（重要）
+
+**你的数据只在本机，永远不与 GitHub 发生任何关系。**
+
+数据库是单个 SQLite 文件，位置：
+
+```
+<项目根目录>/data/engineer_desk.db       # 主库（便签、待办、项目、配置）
+<项目根目录>/data/engineer_desk.db-wal   # WAL 预写日志（SQLite 运行时自动生成）
+<项目根目录>/data/engineer_desk.db-shm   # 共享内存文件（同上）
+```
+
+这些文件通过 `.gitignore` 被排除在版本控制之外，属于**未被跟踪的文件**：
+
+- `git pull` **不会**删除或覆盖它们——Git 只会动被跟踪的文件
+- `git status` 里看不到它们
+- 换代码 = 更新 `src/` 等被跟踪文件，数据照旧留在原处
+
+也就是说：**在公司电脑下拉最新提交，你的笔记一条都不会少。**
+
+### 数据表结构
+
+| 表 | 用途 | 关键字段 |
+|---|---|---|
+| `sticky_notes` | 便签正文（含富文本 HTML、内嵌图片） | `date`, `title`, `content`, `font_*`, `bg_color` |
+| `todos` | 待办条目 | `sticky_note_id`, `content`, `completed`, `sort_order` |
+| `projects` / `project_items` | 项目与进度条目 | `name`, `title`, `status`, `last_progress` |
+| `note_tags` | 便签标签 | `sticky_note_id`, `tag_name` |
+| `config` | 应用配置（键值） | `key`, `value` |
+
+除此之外还有一处本地状态：**草图画板（Engineer Sketch）的画布内容存在浏览器 `localStorage`**，同样不落任何文件、不上传。
+
+### 想迁移 / 转移数据
+
+直接拷贝 `data/engineer_desk.db`（连同 `-wal`、`-shm`，或先退出应用再拷），放到新机器的同一目录即可。 Lost software, not data.
+
+### 保护机制
+
+仓库自带 `pre-commit` 钩子，防止误把本地数据提交上去（`git add -f` 也拦得住）。启用一次即可：
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## 运行
 
 ```bash
@@ -66,6 +110,7 @@ src/
 ├── widgets/       # 便签编辑器 / Todo / 日历 / 搜索 / 项目管理等控件
 ├── services/      # 自动保存 / 配置 / 本地 HTTP 服务（草图板）
 └── ...
+data/              # 本地数据库（不入库，见「数据存在哪」）
 sketch-app/        # Engineer Sketch 前端源码（Vite + React + Excalidraw）
 docs/              # 设计稿、实现说明与截图
 Roadmap.md         # 版本路线图
