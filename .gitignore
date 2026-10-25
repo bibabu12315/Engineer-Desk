@@ -14,5 +14,8 @@ build/
 dist/
 *.pyz
 
+# 草图画板前端依赖（sketch-app 源码与 resources/sketch 产物均入库）
+sketch-app/node_modules/
+
 # 本地工作记忆
 .workbuddy/

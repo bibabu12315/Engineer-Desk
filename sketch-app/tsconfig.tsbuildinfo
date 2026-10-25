@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/ghostoverlay.tsx","./src/wavepanel.tsx","./src/main.tsx","./src/useplacetool.ts","./src/wavegen/place.ts","./src/wavegen/pwm.ts","./src/wavegen/registry.ts","./src/wavegen/theme.ts","./src/wavegen/toelements.ts","./src/wavegen/triangle.ts","./src/wavegen/types.ts","./vite.config.ts"],"version":"5.9.3"}

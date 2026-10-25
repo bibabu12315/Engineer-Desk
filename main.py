@@ -47,6 +47,9 @@ def main() -> None:
     # 连接关闭信号
     window.close_requested.connect(lambda: None)  # 隐藏到托盘
 
+    # 退出时关掉草图画板本地服务
+    app.aboutToQuit.connect(_shutdown_sketch)
+
     # 显示窗口
     window.show_window()
 
@@ -58,6 +61,16 @@ def _quit_app(app: QApplication, window: StickyNoteWindow) -> None:
     """安全退出应用"""
     window.close()  # 触发 closeEvent 保存数据
     app.quit()
+
+
+def _shutdown_sketch() -> None:
+    """关闭草图画板本地服务（延迟导入，避免拖慢启动）"""
+    try:
+        from src.services.sketch_service import shutdown as sketch_shutdown
+
+        sketch_shutdown()
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

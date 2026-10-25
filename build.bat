@@ -26,7 +26,7 @@ if exist "dist" rmdir /s /q "dist"
 if exist "*.spec" del /q "*.spec" 2>nul
 
 echo [3/3] Building...
-python -m PyInstaller --onefile --windowed --name "EngineerDesk" --distpath "dist\EngineerDesk" --hidden-import PySide6 --clean main.py
+python -m PyInstaller --onefile --windowed --name "EngineerDesk" --distpath "dist\EngineerDesk" --hidden-import PySide6 --add-data "resources\sketch;resources\sketch" --clean main.py
 
 if %errorlevel% equ 0 (
     echo.

@@ -15,7 +15,7 @@ from PySide6.QtCore import Qt, Signal, QPoint, QEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QLineEdit, QPushButton, QLabel, QFrame, QColorDialog,
-    QComboBox, QSlider, QMenu, QWidgetAction,
+            QComboBox, QSlider, QMenu, QWidgetAction, QMessageBox,
 )
 from PySide6.QtGui import QFont, QColor, QAction, QMouseEvent, QIcon, QPixmap, QTextCursor
 
@@ -123,14 +123,6 @@ class StickyNoteWindow(QMainWindow):
         editor_layout.setContentsMargins(0, 0, 0, 0)
         editor_layout.setSpacing(2)
 
-        # 面板微标注（仅分区模式显示）
-        self._record_hint = QLabel("记录 · 右键分割线块可归档")
-        self._record_hint.setStyleSheet(
-            f"font-size: 10px; color: {theme.SECONDARY}; padding: 0 4px;"
-        )
-        self._record_hint.hide()
-        editor_layout.addWidget(self._record_hint)
-
         self._editor = StickyEditor()
         self._editor.content_changed.connect(self._auto_save.trigger)
         self._editor.archive_requested.connect(self._archive_block)
@@ -155,12 +147,6 @@ class StickyNoteWindow(QMainWindow):
         draft_layout = QVBoxLayout(self._draft_container)
         draft_layout.setContentsMargins(0, 0, 0, 0)
         draft_layout.setSpacing(2)
-        self._draft_hint = QLabel("草稿 · 自动保存可搜索")
-        self._draft_hint.setStyleSheet(
-            f"font-size: 10px; color: {theme.SECONDARY}; padding: 0 4px;"
-        )
-        self._draft_hint.hide()
-        draft_layout.addWidget(self._draft_hint)
         draft_layout.addWidget(self._draft_editor, 1)
 
         self._h_split.addWidget(editor_container)
@@ -361,6 +347,9 @@ class StickyNoteWindow(QMainWindow):
         # 左右分割开关（V2.0-b，状态按天记忆）
         self._split_btn = add_btn("⬌", "切换 单栏 / 左右分区（按天记忆）", self._toggle_split)
 
+        # 草图画板入口（V2.1）：用系统浏览器打开本地 Excalidraw + 波形生成器
+        add_btn("✏️", "草图画板（含波形生成器）", self._open_sketch)
+
         return bar
 
     # ==================== 左右分割（V2.0-b） ====================
@@ -376,20 +365,18 @@ class StickyNoteWindow(QMainWindow):
         # 面板化：分区时左暖右冷两块圆角面板，单栏时透明
         record_pane = self._editor.parentWidget()
         draft_pane = self._draft_editor.parentWidget()
-        for pane, name, bg, hint in (
-            (record_pane, "recordPane", theme.PANE_BG, self._record_hint),
-            (draft_pane, "draftPane", theme.DRAFT_BG, self._draft_hint),
+        for pane, name, bg in (
+            (record_pane, "recordPane", theme.PANE_BG),
+            (draft_pane, "draftPane", theme.DRAFT_BG),
         ):
             if on:
                 pane.setStyleSheet(
                     f"QWidget#{name} {{ background: {bg}; border-radius: 12px; }}"
                 )
                 pane.layout().setContentsMargins(8, 4, 8, 8)
-                hint.show()
             else:
                 pane.setStyleSheet("QWidget { background: transparent; }")
                 pane.layout().setContentsMargins(0, 0, 0, 0)
-                hint.hide()
 
         self._auto_save.trigger()
 
@@ -764,6 +751,20 @@ class StickyNoteWindow(QMainWindow):
         """同步托盘菜单的开机启动状态到设置页"""
         if self._settings_dialog is not None:
             self._settings_dialog.set_auto_start_state(enabled)
+
+    # ==================== 草图画板（V2.1） ====================
+
+    def _open_sketch(self) -> None:
+        """用系统默认浏览器打开草图画板（Excalidraw + 波形生成器）"""
+        from src.services.sketch_service import open_sketch
+
+        if not open_sketch():
+            QMessageBox.warning(
+                self,
+                "草图画板",
+                "未找到画板文件 resources/sketch/index.html。\n"
+                "请先在 sketch-app/ 下执行：npm install && npm run build && npm run deploy",
+            )
 
     def _on_tag_clicked(self, tag: str) -> None:
         """标签被点击：在搜索对话框中搜索"""

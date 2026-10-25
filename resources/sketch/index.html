@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Engineer Sketch</title>
+    <script>
+      // Excalidraw 的手绘字体、语言包从本地目录加载，保证完全离线可用。
+      // 必须在加载包之前设置，否则会回落到 unpkg CDN。
+      window.EXCALIDRAW_ASSET_PATH = "./";
+      // 启动自检：把早期脚本错误暴露到 <html data-boot-error>，
+      // 便于离线环境下定位白屏问题（不影响正常功能）。
+      window.addEventListener("error", (e) => {
+        try {
+          document.documentElement.setAttribute(
+            "data-boot-error",
+            String((e && (e.message || e.type)) || "unknown")
+          );
+        } catch (_) {}
+      });
+    </script>
+    <script type="module" crossorigin src="./assets/index-CEFUhdPM.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CJat6VyS.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

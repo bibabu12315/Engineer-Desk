@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>波形生成器 · 交互设计专项 Rev3</title>
+<style>
+  :root{
+    --bg:#FAFAFA; --paper:#FFFFFF; --ink:#1B1B1F; --ink2:#55555F; --ink3:#8E8E99;
+    --line:#E4E4E9; --accent:#6965DB; --accent-soft:#EEEEFB;
+    --warn:#C93B3B; --ok:#2E8B57; --radius:12px; --radius-s:8px;
+    --shadow-island:0 2px 4px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    font-size:14px;line-height:1.65}
+  .wrap{max-width:980px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:26px;letter-spacing:.5px;margin-bottom:6px}
+  .meta{color:var(--ink3);font-size:13px;margin-bottom:36px}
+  section{margin-bottom:56px}
+  h2{font-size:18px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+  .no{background:var(--ink);color:#fff;border-radius:6px;font-size:12px;padding:2px 8px;font-weight:600}
+  p.lead{color:var(--ink2);margin-bottom:14px;max-width:760px}
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin-bottom:16px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  th{background:#F5F5F7;text-align:left;padding:8px 10px;font-weight:600;border:1px solid var(--line)}
+  td{padding:8px 10px;border:1px solid var(--line);vertical-align:top}
+  code{background:#F1F1F4;border-radius:4px;padding:1px 5px;font-family:Consolas,monospace;font-size:12.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .tag{display:inline-block;border-radius:999px;font-size:11px;padding:2px 10px;font-weight:600}
+  .tag.fix{background:#FDECEC;color:var(--warn)}
+  .tag.new{background:var(--accent-soft);color:var(--accent)}
+  .callout{border-left:3px solid var(--accent);background:var(--accent-soft);
+    border-radius:0 var(--radius-s) var(--radius-s) 0;padding:12px 16px;font-size:13px;margin:14px 0}
+  .callout b{color:var(--accent)}
+  kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:#fff;
+    padding:0 6px;font-size:12px;font-family:inherit}
+
+  /* ===== 浏览器 mock ===== */
+  .browser{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    box-shadow:0 12px 40px rgba(0,0,0,.08);margin:18px 0}
+  .bchrome{display:flex;align-items:center;gap:10px;padding:9px 14px;background:#F5F5F7;border-bottom:1px solid var(--line)}
+  .dots i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:#DDD}
+  .addr{flex:1;background:#fff;border:1px solid var(--line);border-radius:6px;padding:3px 12px;
+    font-size:11.5px;color:var(--ink3)}
+  .stage{position:relative;height:460px;background:#FBFBFC;
+    background-image:radial-gradient(#ECECEF 1px,transparent 1px);background-size:24px 24px}
+  .topbar{position:absolute;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:6}
+  .island{display:flex;align-items:center;gap:2px;background:#fff;border:1px solid #E6E6EA;
+    border-radius:12px;padding:5px 7px;box-shadow:var(--shadow-island)}
+  .tbtn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+    border-radius:8px;color:#494952;font-size:14px;cursor:default}
+  .tbtn.on{background:#EDEDF6}
+  .tbtn.wave{width:auto;padding:0 12px;gap:6px;font-size:13px;font-weight:600;
+    background:var(--accent);color:#fff}
+  /* 浮动属性面板（Excalidraw 语言） */
+  .fpanel{position:absolute;top:64px;left:16px;width:236px;background:#fff;
+    border:1px solid #E6E6EA;border-radius:var(--radius);box-shadow:var(--shadow-island);
+    padding:12px 14px;z-index:5;font-size:12.5px}
+  .fp-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .fp-head b{font-size:13px}
+  .fp-head .x{color:var(--ink3);cursor:pointer;font-size:14px;line-height:1}
+  .seg2{display:flex;background:#F1F1F4;border-radius:9px;padding:3px;margin-bottom:12px}
+  .seg2 i{flex:1;text-align:center;border-radius:7px;padding:5px 0;color:var(--ink2);cursor:pointer;font-weight:500}
+  .seg2 i.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.10)}
+  .fl{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-top:1px solid #F2F2F5}
+  .fl label{color:var(--ink2)}
+  .stepper{display:flex;align-items:center;gap:8px}
+  .stepper .v{min-width:34px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+  .stepper button{width:20px;height:20px;border:1px solid var(--line);border-radius:6px;background:#fff;
+    color:var(--ink2);font-size:12px;line-height:1;cursor:pointer}
+  .segopt{display:flex;gap:4px}
+  .segopt i{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11.5px;color:var(--ink2)}
+  .segopt i.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .place-hint{margin-top:10px;background:#F7F7FA;border-radius:8px;padding:7px 10px;
+    font-size:11.5px;color:var(--ink3);text-align:center}
+  .place-hint b{color:var(--accent);font-weight:600}
+
+  /* ghost 状态演示 */
+  .ghost-svg{position:absolute;inset:0;pointer-events:none}
+  .crosshair{position:absolute;width:20px;height:20px;z-index:4}
+  .stlabel{position:absolute;right:16px;top:16px;z-index:7;display:flex;gap:6px}
+  .stlabel .tag{background:#fff;border:1px solid var(--line);color:var(--ink2);padding:4px 12px}
+  .stlabel .tag.cur{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .ghostbox{position:absolute;border:1.6px dashed var(--accent);border-radius:4px;
+    background:rgba(105,101,219,.06);z-index:3}
+  .dim{position:absolute;font-size:10.5px;color:var(--accent);font-weight:600;z-index:4}
+  .wl{font-size:11px;fill:#8E8E99}
+  .wav{fill:none;stroke:#1B1B1F;stroke-width:1.6}
+  .wavb{fill:none;stroke:#5B7FD6;stroke-width:1.6}
+  .mk{stroke:#E24B4A;stroke-width:1;stroke-dasharray:4 3}
+
+  ul.tight{padding-left:20px}
+  ul.tight li{margin:4px 0}
+  .pill{background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>波形生成器 · 交互设计专项</h1>
+  <div class="meta">Engineer Sketch — Wavegen Panel Interaction Spec · Rev3 · 2026-10-25 · 仅覆盖「∿ 波形」面板与放置交互，其余见总稿</div>
+
+  <!-- 01 -->
+  <section>
+    <h2><span class="no">01</span>Rev2 → Rev3 改了什么</h2>
+    <table>
+      <tr><th style="width:120px">问题</th><th>Rev2（旧）</th><th>Rev3（本稿）</th></tr>
+      <tr><td>面板形态</td><td><span class="tag fix">割裂</span> 占据左侧一整列，画布被挤压重排，与 Excalidraw「悬浮 island」设计语言不符</td>
+          <td><span class="tag new">对齐</span> 浮动属性卡：锚定画布左上，宽 236px，白底 + 12px 圆角 + Excalidraw 同款投影；出现/消失不改变画布布局</td></tr>
+      <tr><td>信息架构</td><td><span class="tag fix">无设计</span> 所有模板与参数平铺一列，模板增多即失控</td>
+          <td><span class="tag new">族制</span> 顶层「波形族」二选一（PWM / 三角波），切换后只渲染该族参数；新增波形 = 注册新族，面板零改动</td></tr>
+      <tr><td>放置方式</td><td><span class="tag fix">笼统</span> 「插入到画布」按钮，落在视口中心，大小固定</td>
+          <td><span class="tag new">手感</span> 参数调好 → 画布点击即放置；按住拖拽决定宽高与幅度（ghost 实时预览），与 Excalidraw/Figma 画矩形心智一致</td></tr>
+    </table>
+  </section>
+
+  <!-- 02 -->
+  <section>
+    <h2><span class="no">02</span>面板形态：浮动属性卡</h2>
+    <p class="lead">与 Excalidraw 原生属性面板同语言：浮在画布上、不参与布局流。顶栏「∿ 波形」按钮仍是唯一入口，点击开合（快捷键 <kbd>W</kbd>）。</p>
+    <table>
+      <tr><th>项</th><th>规格</th></tr>
+      <tr><td>位置</td><td>画布视口左上角，<code>top:64px; left:16px</code>（避开顶栏 island）；固定，不随画布平移缩放</td></tr>
+      <tr><td>尺寸</td><td>宽 236px 固定；高度随内容自适应（族切换时平滑过渡 160ms）</td></tr>
+      <tr><td>视觉令牌</td><td>白底 <code>#FFFFFF</code> · 描边 <code>#E6E6EA</code> · 圆角 12px · 投影 <code>0 2px 4px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08)</code> —— 与 Excalidraw island 完全一致</td></tr>
+      <tr><td>显隐</td><td>「∿ 波形」点击切换 / <kbd>W</kbd> / <kbd>Esc</kbd> 关闭；出现动画：从左侧 8px 滑入 + fade，180ms ease-out</td></tr>
+      <tr><td>激活态</td><td>面板开着时，顶栏「∿ 波形」按钮保持高亮（同 Excalidraw 选中工具态）；画布交互完全不受影响</td></tr>
+      <tr><td>折叠态参数</td><td>面板关闭后参数保留在内存 + 场景属性中，重开原样恢复</td></tr>
+    </table>
+    <div class="callout"><b>为什么不用左列</b>：Excalidraw 的画布是全屏自由空间，属性面板悬浮其上。左列会挤压画布、重排已有内容，且视觉上多了一层"窗口套窗口"。浮动卡是 Excalidraw、tldraw、Figma 共同的设计语言，用户零学习成本。</div>
+  </section>
+
+  <!-- 03 -->
+  <section>
+    <h2><span class="no">03</span>信息架构：波形族 + 族内参数</h2>
+    <div class="grid2">
+      <div class="card">
+        <b>结构（三层）</b>
+        <ul class="tight">
+          <li><b>波形族</b>：顶部 2-tab 分段控件——<b>PWM</b> / <b>三角波</b>。后续新增波形（正弦、梯形、自定义逐段…）即新增一个 tab。</li>
+          <li><b>族参数</b>：仅渲染当前族的字段，字段由族的 schema 声明（数字步进器 / 选项段 / 文本）。</li>
+          <li><b>放置</b>：面板底部无按钮——参数区本身就是"待发状态"，放置由画布交互完成（见 §4）。</li>
+        </ul>
+        <div class="callout" style="margin-bottom:0"><b>扩展机制</b>：每个族 = 一个注册项 <code>{ id, 标签名, schema[], generate(params, bbox) }</code>。WavePanel 读注册表自动渲染 tab 与字段，<b>加波形不动面板代码</b>。</div>
+      </div>
+      <div class="card">
+        <b>两族参数定义</b>
+        <table style="margin-top:6px">
+          <tr><th>族</th><th>字段</th></tr>
+          <tr><td><b>PWM</b></td><td>周期数 N（默认 5）<br>占空比 D%（默认 40）<br>互补 + 死区（关 / 开，默认开）<br>死区（格，0.5）<span style="color:var(--ink3)">（仅互补开时显示）</span></td></tr>
+          <tr><td><b>三角波</b></td><td>周期数 N（默认 5）<br>计数模式（向上 / 中央对齐 / 向下，默认中央对齐）<br>幅值（格，默认 8）</td></tr>
+        </table>
+        <div style="color:var(--ink3);font-size:12px;margin-top:8px">条件显隐：字段可声明 <code>visibleWhen</code>，如「死区」仅在互补开启时出现。</div>
+      </div>
+    </div>
+
+    <div class="browser">
+      <div class="bchrome"><span class="dots"><i></i><i></i><i></i></span><span class="addr">resources/sketch/index.html — 状态 A：面板开启（PWM 族）</span></div>
+      <div class="stage" id="stageA">
+        <div class="topbar">
+          <div class="island"><div class="tbtn">🖐</div><div class="tbtn">▢</div><div class="tbtn">◇</div><div class="tbtn">→</div><div class="tbtn">—</div><div class="tbtn">✎</div><div class="tbtn">A</div></div>
+          <div class="island"><div class="tbtn wave">∿ 波形</div></div>
+        </div>
+        <div class="fpanel" id="fp">
+          <div class="fp-head"><b>∿ 波形</b><span class="x" title="关闭 W / Esc">✕</span></div>
+          <div class="seg2" id="familyTabs">
+            <i class="on" data-f="pwm">PWM</i><i data-f="tri">三角波</i>
+          </div>
+          <div id="famPwm">
+            <div class="fl" style="border-top:none"><label>周期数</label><div class="stepper"><button>−</button><span class="v">5</span><button>＋</button></div></div>
+            <div class="fl"><label>占空比 %</label><div class="stepper"><button>−</button><span class="v">40</span><button>＋</button></div></div>
+            <div class="fl"><label>互补 + 死区</label><div class="segopt"><i class="on">开</i><i>关</i></div></div>
+            <div class="fl" id="dtRow"><label>死区（格）</label><div class="stepper"><button>−</button><span class="v">0.5</span><button>＋</button></div></div>
+          </div>
+          <div id="famTri" style="display:none">
+            <div class="fl" style="border-top:none"><label>周期数</label><div class="stepper"><button>−</button><span class="v">5</span><button>＋</button></div></div>
+            <div class="fl"><label>计数模式</label><div class="segopt"><i>向上</i><i class="on">中央</i><i>向下</i></div></div>
+            <div class="fl"><label>幅值（格）</label><div class="stepper"><button>−</button><span class="v">8</span><button>＋</button></div></div>
+          </div>
+          <div class="place-hint">在画布<b>单击放置</b> · <b>按住拖拽</b>定大小</div>
+        </div>
+        <svg class="ghost-svg" width="100%" height="100%">
+          <text class="wl" x="270" y="180">PWM · 互补 CHA2/CHB1（已放置示例）</text>
+          <path class="wavb" d="M270 210 H310 V190 H365 V210 H420 V190 H475 V210 H530 V190 H585 V210 H640"/>
+          <path class="wav" d="M270 300 H318 V280 H373 V300 H428 V280 H483 V300 H538 V280 H593 V300 H640"/>
+        </svg>
+      </div>
+    </div>
+    <p style="color:var(--ink3);font-size:12px;margin-top:-8px">▲ 上面板可交互：点「三角波」tab 看族切换（条件显隐：PWM→关掉互补，死区行消失）。</p>
+  </section>
+
+  <!-- 04 -->
+  <section>
+    <h2><span class="no">04</span>放置交互：点一下就落，拖一下定大小</h2>
+    <p class="lead">对齐 Excalidraw 画矩形的心智模型：<b>面板只管参数，画布只管位置和大小</b>。不再有"插入到画布"按钮。</p>
+
+    <table>
+      <tr><th style="width:110px">状态</th><th>触发</th><th>画布表现</th><th>光标</th></tr>
+      <tr><td><b>S1 待发</b></td><td>面板开启且族已选</td><td>无变化</td><td><code>crosshair</code> 十字（进入画布区域后）</td></tr>
+      <tr><td><b>S2 拖拽中</b></td><td>画布 <code>pointerdown</code> 并移动</td><td><b>ghost 预览</b>：按当前族参数在拖出的包围盒内实时绘制半透明虚线波形 + 宽/高尺寸标注；<b>水平拖 = 宽度</b>（决定周期宽），<b>垂直拖 = 幅度</b>（覆盖面板"幅值/格"），参数驱动的通道数、周期数不变</td><td>十字</td></tr>
+      <tr><td><b>S3 提交</b></td><td><code>pointerup</code></td><td>ghost 转正：注入原生 Excalidraw 元素（波形折线 + 通道名 + 标注虚线），整组自动选中，可直接拖动/缩放/改色</td><td>默认</td></tr>
+      <tr><td><b>单击放置</b></td><td><code>pointerdown → up</code> 位移 &lt; 4px</td><td>按默认尺寸放置：周期宽 20px × 默认幅值，锚点 = 点击点左上</td><td>—</td></tr>
+      <tr><td><b>取消</b></td><td>拖拽中 <kbd>Esc</kbd> 或右键</td><td>ghost 消失，回到 S1，已调参数保留</td><td>—</td></tr>
+    </table>
+
+    <div class="grid2">
+      <div>
+        <div class="browser" style="margin-top:0">
+          <div class="bchrome"><span class="dots"><i></i><i></i><i></i></span><span class="addr">状态 B：拖拽中（ghost 预览）</span></div>
+          <div class="stage">
+            <div class="stlabel"><span class="tag cur">S2 拖拽中</span></div>
+            <svg class="ghost-svg" width="100%" height="100%">
+              <line x1="200" y1="0" x2="200" y2="460" stroke="#E24B4A" stroke-width="1" stroke-dasharray="3 3" opacity=".4"/>
+              <g opacity=".75">
+                <path class="wav" stroke-dasharray="5 4" d="M200 240 L260 160 L320 240 L380 160 L440 240 L500 160"/>
+                <text class="wl" x="200" y="140">三角波 · 中央对齐 · 5 周期</text>
+              </g>
+              <text x="295" y="262" fill="#6965DB" font-size="11" font-weight="600">600 px</text>
+              <text x="460" y="205" fill="#6965DB" font-size="11" font-weight="600" transform="rotate(90 460 205)">80 px</text>
+            </svg>
+            <div class="ghostbox" style="left:200px;top:150px;width:300px;height:100px"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="browser" style="margin-top:0">
+          <div class="bchrome"><span class="dots"><i></i><i></i><i></i></span><span class="addr">状态 C：提交后（原生元素，整组选中）</span></div>
+          <div class="stage">
+            <div class="stlabel"><span class="tag cur">S3 已提交</span></div>
+            <svg class="ghost-svg" width="100%" height="100%">
+              <g>
+                <text class="wl" x="200" y="140">三角波 · 中央对齐 · 5 周期</text>
+                <path class="wav" d="M200 240 L260 160 L320 240 L380 160 L440 240 L500 160"/>
+                <rect x="192" y="132" width="316" height="128" fill="none" stroke="#6965DB" stroke-width="1.4" stroke-dasharray="4 3" rx="2"/>
+                <g fill="#fff" stroke="#6965DB" stroke-width="1.4">
+                  <rect x="190" y="130" width="7" height="7" rx="1.5"/><rect x="505" y="130" width="7" height="7" rx="1.5"/>
+                  <rect x="190" y="254" width="7" height="7" rx="1.5"/><rect x="505" y="254" width="7" height="7" rx="1.5"/>
+                </g>
+              </g>
+              <text x="200" y="330" fill="#8E8E99" font-size="11">↳ 原生元素：可整组拖动 · 缩放 · 手加红虚线 CMP/S·H 标注</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout"><b>拖拽语义（映射规则）</b>：拖出的包围盒 = 波形的"物理画幅"。周期宽 = 盒宽 ÷ N；线幅 = 盒高。面板中的"占空比/计数模式/互补"等<b>形状参数</b>在拖拽中不变，只有"大小类"参数（幅值）被垂直拖动覆盖。Shift 拖 = 锁定默认比例（只改位置不改大小？否——只等比放大）。</div>
+  </section>
+
+  <!-- 05 -->
+  <section>
+    <h2><span class="no">05</span>细节与边界</h2>
+    <table>
+      <tr><th style="width:190px">场景</th><th>行为</th></tr>
+      <tr><td>面板开着时切换工具（如选中 ▢）</td><td>面板保持但暂停"待发态"（光标恢复默认）；点回空白处（无元素）且当前工具为选择工具时恢复待发。避免误落波形。</td></tr>
+      <tr><td>参数修改时画布已有 ghost</td><td>不支持——ghost 仅存在于拖拽过程中，参数修改只能发生在 S1</td></tr>
+      <tr><td>画布缩放/平移中拖拽</td><td>拖拽启动即锁定视口，拖拽期间滚轮平移忽略；ghost 坐标全部用视口坐标系</td></tr>
+      <tr><td>拖得太小（&lt;40×24px）</td><td>视为误触，回落为"默认尺寸单击放置"，避免生成不可编辑的迷你波形</td></tr>
+      <tr><td>重复放置</td><td>提交后面板保持开启、参数保留，可连续点画多组（S3 → S1 无感循环）</td></tr>
+      <tr><td>Undo</td><td>整组一次 <code>updateScene</code> 注入，Ctrl+Z 一次撤一组</td></tr>
+      <tr><td>参数随场景保存（已拍板 Q1）</td><td>组的每个 line 元素携带 <code>customData: { waveFamily, params, bbox }</code>；双击组内任一元素 → 面板打开并还原该组参数，改参后<b>原位重生成</b>（替换旧组，位置=原 bbox）</td></tr>
+      <tr><td>面板遮挡画布内容</td><td>浮动卡可拖拽标题栏移动位置（记忆到 localStorage）；默认位置放左上角空白概率最高</td></tr>
+    </table>
+  </section>
+
+  <!-- 06 -->
+  <section>
+    <h2><span class="no">06</span>实现要点（交接）</h2>
+    <div class="card">
+<pre>sketch-app/src/
+├── WavePanel.tsx        <span class="c"># 浮动卡：族tabs + schema 渲染 + 待发状态机（S1-S3）</span>
+├── wavegen/
+│   ├── registry.ts      <span class="c"># 族注册表 { id, label, schema, generate(params,bbox) }</span>
+│   ├── pwm.ts           <span class="c"># 单路 / 互补+死区（同一族内选项）</span>
+│   └── triangle.ts      <span class="c"># 向上 / 中央对齐 / 向下</span>
+└── usePlaceTool.ts      <span class="c"># pointerdown/move/up + ghost overlay + Esc/右键取消</span></pre>
+      <ul class="tight" style="margin-top:10px">
+        <li><b>ghost 不进 scene</b>：拖拽中的预览画在独立 SVG overlay（绝对定位在画布容器上），<code>pointerup</code> 才 <code>updateScene</code> 注入真元素——不污染 undo 栈。</li>
+        <li><b>坐标系</b>：ghost 用视口 px；提交时经 <code>getViewportCoords()</code> 换算为场景坐标，再按包围盒映射周期宽/幅值。</li>
+        <li><b>双击编辑</b>：命中 <code>customData.waveFamily</code> 的元素组 → 面板开 + 参数回填 + 重生成替换。这是 Q1（参数随场景保存）的交互闭环。</li>
+        <li><b>待发光标</b>：给画布容器加 <code>cursor:crosshair</code> 类，仅当面板开启且无选中元素时生效。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <b>验收标准（V2.1-b 更新版）</b>
+      <ul class="tight">
+        <li>点「∿ 波形」→ 左上浮出属性卡，画布布局<b>零变化</b>；再点/<kbd>W</kbd>/<kbd>Esc</kbd> 收起。</li>
+        <li>PWM / 三角波 tab 切换，字段只显示当前族的；互补关 → 死区行消失。</li>
+        <li>画布单击 → 默认尺寸落图；按住拖拽 → 虚线 ghost 跟手 + 宽高标注 → 松手转正并整组选中。</li>
+        <li>拖拽中 <kbd>Esc</kbd> 取消无残留；连续放置 ≥ 3 组参数不丢。</li>
+        <li>双击已生成波形组 → 面板回填参数 → 改占空比重生成 → 旧组被原位替换。</li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+  var tabs = document.querySelectorAll('#familyTabs i');
+  var famPwm = document.getElementById('famPwm');
+  var famTri = document.getElementById('famTri');
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){
+      tabs.forEach(function(x){x.classList.remove('on')});
+      t.classList.add('on');
+      var pwm = t.dataset.f === 'pwm';
+      famPwm.style.display = pwm ? '' : 'none';
+      famTri.style.display = pwm ? 'none' : '';
+    });
+  });
+</script>
+</body>
+</html>

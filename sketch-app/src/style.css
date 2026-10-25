@@ -1,0 +1,285 @@
+/* ============================================================
+   Engineer Sketch —— 全局样式
+   视觉令牌与 Excalidraw island 保持一致（设计稿 §2）：
+     白底 #FFFFFF · 描边 #E6E6EA · 圆角 12px
+     投影 0 2px 4px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.08)
+   ============================================================ */
+
+:root {
+  --sk-accent: #ff9f0a; /* 强调色，对齐 Engineer Desk 主工具 */
+  --sk-wave-blue: #5b7fd6;
+  --sk-mark-red: #e24b4a;
+  --sk-label: #8e8e99;
+  --sk-line: #e6e6ea;
+  --sk-shadow-island: 0 2px 4px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 14px;
+  color: #1b1b1f;
+}
+
+/* 舞台：所有自绘 UI（入口 island / 浮动卡 / ghost）的定位上下文 */
+.sketch-stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.excalidraw-wrapper {
+  position: absolute;
+  inset: 0;
+}
+
+/* ============================ 顶栏入口 island ============================ */
+
+.wave-island-anchor {
+  position: absolute;
+  top: 14px;
+  z-index: 4; /* 与 Excalidraw layerUI 同层 */
+}
+
+.wave-island {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  background: #ffffff;
+  border: 1px solid var(--sk-line);
+  border-radius: 12px;
+  box-shadow: var(--sk-shadow-island);
+  font-size: 13px;
+  font-weight: 600;
+  color: #494952;
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.wave-island:hover {
+  background: #f7f7fa;
+}
+
+.wave-island .ico {
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* 激活态：面板开着时保持高亮 */
+.wave-island.on {
+  background: var(--sk-accent);
+  border-color: var(--sk-accent);
+  color: #ffffff;
+}
+
+/* ============================ 浮动属性卡 ============================ */
+
+.fpanel.wave-panel {
+  position: absolute;
+  z-index: 8; /* 浮在画布与 Excalidraw UI 之上 */
+  background: #ffffff;
+  border: 1px solid var(--sk-line);
+  border-radius: 12px;
+  box-shadow: var(--sk-shadow-island);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  animation: wave-panel-in 180ms ease-out;
+}
+
+@keyframes wave-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.wave-panel .fp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  cursor: grab;
+  user-select: none;
+}
+
+.wave-panel .fp-head:active {
+  cursor: grabbing;
+}
+
+.wave-panel .fp-head b {
+  font-size: 13px;
+}
+
+.wave-panel .fp-head .x {
+  color: var(--sk-label);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.wave-panel .fp-head .x:hover {
+  color: #1b1b1f;
+}
+
+/* 族 tab 分段控件 */
+.wave-panel .seg2 {
+  display: flex;
+  background: #f1f1f4;
+  border-radius: 9px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.wave-panel .seg2 i {
+  flex: 1;
+  text-align: center;
+  border-radius: 7px;
+  padding: 5px 0;
+  color: #55555f;
+  cursor: pointer;
+  font-style: normal;
+  font-weight: 500;
+  transition: background 160ms ease-out, color 160ms ease-out;
+}
+
+.wave-panel .seg2 i.on {
+  background: #ffffff;
+  color: #1b1b1f;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 族参数区：族切换时重新挂载并淡入（160ms） */
+.wave-panel .fam-body {
+  animation: wave-fam-in 160ms ease-out;
+}
+
+@keyframes wave-fam-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wave-panel .fl {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-top: 1px solid #f2f2f5;
+}
+
+.wave-panel .fl:first-child {
+  border-top: none;
+}
+
+.wave-panel .fl label {
+  color: #55555f;
+}
+
+/* 数字步进器 */
+.wave-panel .stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wave-panel .stepper .v {
+  min-width: 34px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.wave-panel .stepper button {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--sk-line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #55555f;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.wave-panel .stepper button:hover {
+  background: #f7f7fa;
+}
+
+/* 选项段 */
+.wave-panel .segopt {
+  display: flex;
+  gap: 4px;
+}
+
+.wave-panel .segopt i {
+  border: 1px solid var(--sk-line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  font-style: normal;
+  color: #55555f;
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.wave-panel .segopt i.on {
+  background: var(--sk-accent);
+  border-color: var(--sk-accent);
+  color: #ffffff;
+}
+
+/* 底部放置提示 */
+.wave-panel .place-hint {
+  margin-top: 10px;
+  background: #f7f7fa;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  color: var(--sk-label);
+  text-align: center;
+}
+
+.wave-panel .place-hint b {
+  color: var(--sk-accent);
+  font-weight: 600;
+}
+
+/* ============================ 放置覆盖层 / ghost ============================ */
+
+.place-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* 高于画布(1/2)，低于 Excalidraw UI(4) 与浮动卡(8) */
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.ghost-svg {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+}
