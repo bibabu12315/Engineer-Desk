@@ -93,12 +93,48 @@ class StickyEditor(QTextEdit):
             self.setPlainText(text or "")
         # 纯文本里的网址也识别成链接
         self._linkify_range(0, len(text or ""))
+        # 颜色归一化：正文一律默认色，仅链接（蓝）与分割线（橙）保留
+        self._normalize_text_colors()
         # 清掉残留的"当前字符格式"，避免光标处继续输入时继承旧高亮/加粗
         self.setCurrentCharFormat(QTextCharFormat())
         cursor = self.textCursor()
         cursor.setBlockFormat(QTextBlockFormat())
         self.setTextCursor(cursor)
         self.blockSignals(False)
+
+    def _normalize_text_colors(self) -> None:
+        """全文颜色归一化：除链接与分割线外，清除一切显式前景色
+
+        规则（用户约定）：正文默认黑色；仅网址链接保留主题蓝、
+        分割线保留品牌橙，复制/历史数据带进来的其他颜色一律清除。
+        顺带清理块尾换行符上的残留颜色，避免光标放在块首时
+        继承前一块换行符的颜色继续输入。
+        """
+        doc = self.document()
+        clear_fg = QTextCharFormat()
+        clear_fg.setForeground(QBrush(Qt.BrushStyle.NoBrush))
+        block = doc.firstBlock()
+        while block.isValid():
+            block_text = block.text()
+            if not self._is_divider(block_text):
+                for fr in block.textFormats():
+                    if fr.format.anchorHref():
+                        continue  # 链接保留主题蓝
+                    cur = QTextCursor(doc)
+                    cur.setPosition(block.position() + fr.start)
+                    cur.setPosition(
+                        block.position() + fr.start + fr.length,
+                        QTextCursor.MoveMode.KeepAnchor,
+                    )
+                    cur.mergeCharFormat(clear_fg)
+            # 清理块尾换行符的残留颜色（textFormats 不含换行符）
+            sep_pos = block.position() + block.length() - 1
+            if 0 <= sep_pos < doc.characterCount() and doc.characterAt(sep_pos) == "\u2029":
+                cur = QTextCursor(doc)
+                cur.setPosition(sep_pos)
+                cur.setPosition(sep_pos + 1, QTextCursor.MoveMode.KeepAnchor)
+                cur.mergeCharFormat(clear_fg)
+            block = block.next()
 
     def get_content(self) -> str:
         """获取存储内容：有格式存 HTML，无格式存纯文本"""
@@ -183,22 +219,25 @@ class StickyEditor(QTextEdit):
         cursor.beginEditBlock()
         if cursor.block().text().strip():
             cursor.insertBlock()
+        # 橙色只作用于分割线字符本身（显式随 insertText 传入，
+        # 不 setCharFormat 污染光标"当前输入格式"）
         fmt = QTextCharFormat()
         fmt.setForeground(QColor("#FF9F0A"))
-        cursor.setCharFormat(fmt)
-        cursor.insertText("─" * 12)
+        cursor.insertText("─" * 12, fmt)
         # 分割线所在块居中（视觉上更像分隔符而非正文）
         cursor.movePosition(QTextCursor.MoveOperation.StartOfBlock)
         bf = QTextBlockFormat()
         bf.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cursor.setBlockFormat(bf)
         cursor.movePosition(QTextCursor.MoveOperation.EndOfBlock)
-        cursor.insertBlock()
+        # 新块的换行符显式用默认字符格式：若继承橙色，换行符会成为
+        # "光标前一个字符"，后续打字/粘贴会全部继承橙色（历史 bug）
         bf = QTextBlockFormat()
         bf.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        cursor.setBlockFormat(bf)
-        cursor.setCharFormat(QTextCharFormat())
+        cursor.insertBlock(bf, QTextCharFormat())
         cursor.endEditBlock()
+        # 同步重置编辑器"当前输入格式"，保证分割线之后输入为默认色
+        self.setCurrentCharFormat(QTextCharFormat())
 
     # ==================== 粘贴行为 ====================
 
